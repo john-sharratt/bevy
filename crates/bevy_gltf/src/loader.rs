@@ -526,9 +526,8 @@ async fn load_gltf<'a, 'b, 'c>(
             let reader = gltf_skin.reader(|buffer| Some(&buffer_data[buffer.index()]));
             let inverse_bindposes: Vec<Mat4> = reader
                 .read_inverse_bind_matrices()
-                .unwrap()
-                .map(|mat| Mat4::from_cols_array_2d(&mat))
-                .collect();
+                .map(|mat| mat.map(|mat| Mat4::from_cols_array_2d(&mat)).collect::<Vec<_>>())
+                .unwrap_or_else(|| vec! [ Mat4::IDENTITY ]);
 
             load_context.add_labeled_asset(
                 skin_label(&gltf_skin),
