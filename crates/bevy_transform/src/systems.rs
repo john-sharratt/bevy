@@ -66,7 +66,7 @@ pub fn propagate_transforms(
                 *global_transform = GlobalTransform::from(*transform);
             }
 
-            for (child, actual_parent) in parent_query.iter_many(children) {
+            for (child, actual_parent) in parent_query.iter_many(children.iter()) {
                 assert_eq!(
                     actual_parent.get(), entity,
                     "Malformed hierarchy. This probably means that your hierarchy has been improperly maintained, or contains a cycle"
@@ -161,7 +161,7 @@ unsafe fn propagate_recursive(
     };
 
     let Some(children) = children else { return };
-    for (child, actual_parent) in parent_query.iter_many(children) {
+    for (child, actual_parent) in parent_query.iter_many(children.iter()) {
         assert_eq!(
             actual_parent.get(), entity,
             "Malformed hierarchy. This probably means that your hierarchy has been improperly maintained, or contains a cycle"

@@ -27,6 +27,7 @@ pub mod futures;
 pub mod synccell;
 pub mod syncunsafecell;
 
+mod cow_arc;
 mod default;
 mod object_safe;
 pub use object_safe::assert_object_safe;
@@ -37,6 +38,7 @@ mod time;
 
 pub use ahash::{AHasher, RandomState};
 pub use bevy_utils_proc_macros::*;
+pub use cow_arc::*;
 pub use default::default;
 pub use hashbrown;
 #[cfg(feature = "std")]

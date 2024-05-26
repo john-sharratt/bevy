@@ -102,7 +102,7 @@ pub use loader::*;
 
 use bevy_app::prelude::*;
 use bevy_asset::{Asset, AssetApp, AssetPath, Handle};
-use bevy_ecs::{prelude::Component, reflect::ReflectComponent};
+use bevy_ecs::{entity::Entity, prelude::Component, reflect::ReflectComponent};
 use bevy_image::CompressedImageFormats;
 use bevy_pbr::StandardMaterial;
 use bevy_reflect::{std_traits::ReflectDefault, Reflect, TypePath};
@@ -186,6 +186,8 @@ pub struct Gltf {
     pub named_materials: HashMap<Box<str>, Handle<StandardMaterial>>,
     /// All nodes loaded from the glTF file.
     pub nodes: Vec<Handle<GltfNode>>,
+    /// List of all the lights spawned within the scene
+    pub lights: HashMap<usize, Vec<Entity>>,
     /// Named nodes loaded from the glTF file.
     pub named_nodes: HashMap<Box<str>, Handle<GltfNode>>,
     /// All skins loaded from the glTF file.

@@ -118,10 +118,11 @@ impl<'a, A: Asset> SavedAsset<'a, A> {
         Q: ?Sized + Hash + Eq,
     {
         let labeled = self.labeled_assets.get(label)?;
-        let value = labeled.asset.value.downcast_ref::<B>()?;
+        let asset = labeled.asset.as_ref()?;
+        let value = asset.value.downcast_ref::<B>()?;
         Some(SavedAsset {
             value,
-            labeled_assets: &labeled.asset.labeled_assets,
+            labeled_assets: &asset.labeled_assets,
         })
     }
 
@@ -132,7 +133,7 @@ impl<'a, A: Asset> SavedAsset<'a, A> {
         Q: ?Sized + Hash + Eq,
     {
         let labeled = self.labeled_assets.get(label)?;
-        Some(&labeled.asset)
+        labeled.asset.as_ref()
     }
 
     /// Returns the [`UntypedHandle`] of the labeled asset with the provided 'label', if it exists.

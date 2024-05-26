@@ -1,6 +1,6 @@
-use alloc::sync::Arc;
 use bevy_asset::{io::Reader, Asset, AssetLoader, LoadContext};
 use bevy_reflect::TypePath;
+use bevy_utils::CowArc;
 use std::io::Cursor;
 
 /// A source of audio data
@@ -17,7 +17,16 @@ pub struct AudioSource {
     /// depending on the features enabled.
     /// If the format used is not enabled,
     /// then this will panic with an `UnrecognizedFormat` error.
-    pub bytes: Arc<[u8]>,
+    pub bytes: CowArc<'static, [u8]>,
+}
+
+impl AudioSource {
+    /// Creates a new [`AudioSource`] from raw audio data.
+    pub fn new(bytes: impl Into<CowArc<'static, [u8]>>) -> Self {
+        Self {
+            bytes: bytes.into(),
+        }
+    }
 }
 
 impl AsRef<[u8]> for AudioSource {
@@ -51,7 +60,7 @@ impl AssetLoader for AudioLoader {
         let mut bytes = Vec::new();
         reader.read_to_end(&mut bytes).await?;
         Ok(AudioSource {
-            bytes: bytes.into(),
+            bytes: CowArc::Owned(bytes.into()),
         })
     }
 

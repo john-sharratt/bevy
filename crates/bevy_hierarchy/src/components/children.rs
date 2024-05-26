@@ -25,7 +25,7 @@ use smallvec::SmallVec;
 /// [`Query`]: bevy_ecs::system::Query
 /// [`Parent`]: crate::components::parent::Parent
 /// [`BuildChildren::with_children`]: crate::child_builder::BuildChildren::with_children
-#[derive(Component, Debug, VisitEntitiesMut)]
+#[derive(Component, Debug)]
 #[cfg_attr(feature = "reflect", derive(bevy_reflect::Reflect))]
 #[cfg_attr(
     feature = "reflect",
@@ -38,7 +38,20 @@ use smallvec::SmallVec;
         FromWorld
     )
 )]
-pub struct Children(pub(crate) SmallVec<[Entity; 8]>);
+pub struct Children {
+    pub(crate) all: SmallVec<[Entity; 8]>,
+    pub(crate) active: Option<SmallVec<[Entity; 8]>>,
+}
+
+impl VisitEntitiesMut for Children {
+    fn visit_entities_mut<F: FnMut(&mut Entity)>(&mut self, f: F) {
+        if let Some(active) = self.active.as_mut() {
+            active.as_mut().iter_mut().for_each(f);
+        } else {
+            self.all.iter_mut().for_each(f);
+        }
+    }
+}
 
 // TODO: We need to impl either FromWorld or Default so Children can be registered as Reflect.
 // This is because Reflect deserialize by creating an instance and apply a patch on top.
@@ -47,7 +60,10 @@ pub struct Children(pub(crate) SmallVec<[Entity; 8]>);
 impl FromWorld for Children {
     #[inline]
     fn from_world(_world: &mut World) -> Self {
-        Children(SmallVec::new())
+        Children {
+            all: SmallVec::new(),
+            active: None,
+        }
     }
 }
 
@@ -55,13 +71,32 @@ impl Children {
     /// Constructs a [`Children`] component with the given entities.
     #[inline]
     pub(crate) fn from_entities(entities: &[Entity]) -> Self {
-        Self(SmallVec::from_slice(entities))
+        Self {
+            all: SmallVec::from_slice(entities),
+            active: None,
+        }
     }
 
     /// Swaps the child at `a_index` with the child at `b_index`.
     #[inline]
     pub fn swap(&mut self, a_index: usize, b_index: usize) {
-        self.0.swap(a_index, b_index);
+        self.all.swap(a_index, b_index);
+        self.active = None;
+    }
+
+    /// Rebuilds the children list using the provided iterator of entities.
+    #[inline]
+    pub fn set_active<I>(&mut self, iter: I)
+    where
+        I: IntoIterator<Item = Entity>,
+    {
+        if self.active.is_none() {
+            self.active = Some(SmallVec::new());
+        } else {
+            let active = self.active.as_mut().unwrap();
+            active.clear();
+            active.extend(iter);
+        }
     }
 
     /// Sorts children [stably](https://en.wikipedia.org/wiki/Sorting_algorithm#Stability)
@@ -73,11 +108,14 @@ impl Children {
     ///
     /// See also [`sort_by_key`](Children::sort_by_key), [`sort_by_cached_key`](Children::sort_by_cached_key).
     #[inline]
-    pub fn sort_by<F>(&mut self, compare: F)
+    pub fn sort_by<F>(&mut self, mut compare: F)
     where
         F: FnMut(&Entity, &Entity) -> core::cmp::Ordering,
     {
-        self.0.sort_by(compare);
+        self.all.sort_by(&mut compare);
+        if let Some(active) = self.active.as_mut() {
+            active.sort_by(&mut compare);
+        }
     }
 
     /// Sorts children [stably](https://en.wikipedia.org/wiki/Sorting_algorithm#Stability)
@@ -89,12 +127,15 @@ impl Children {
     ///
     /// See also [`sort_by`](Children::sort_by), [`sort_by_cached_key`](Children::sort_by_cached_key).
     #[inline]
-    pub fn sort_by_key<K, F>(&mut self, compare: F)
+    pub fn sort_by_key<K, F>(&mut self, mut compare: F)
     where
         F: FnMut(&Entity) -> K,
         K: Ord,
     {
-        self.0.sort_by_key(compare);
+        self.all.sort_by_key(&mut compare);
+        if let Some(active) = self.active.as_mut() {
+            active.sort_by_key(&mut compare);
+        }
     }
 
     /// Sorts children [stably](https://en.wikipedia.org/wiki/Sorting_algorithm#Stability)
@@ -105,12 +146,15 @@ impl Children {
     ///
     /// See also [`sort_by`](Children::sort_by), [`sort_by_key`](Children::sort_by_key).
     #[inline]
-    pub fn sort_by_cached_key<K, F>(&mut self, compare: F)
+    pub fn sort_by_cached_key<K, F>(&mut self, mut compare: F)
     where
         F: FnMut(&Entity) -> K,
         K: Ord,
     {
-        self.0.sort_by_cached_key(compare);
+        self.all.sort_by_cached_key(&mut compare);
+        if let Some(active) = self.active.as_mut() {
+            active.sort_by_cached_key(&mut compare);
+        }
     }
 
     /// Sorts children [unstably](https://en.wikipedia.org/wiki/Sorting_algorithm#Stability)
@@ -122,11 +166,14 @@ impl Children {
     ///
     /// See also [`sort_unstable_by_key`](Children::sort_unstable_by_key).
     #[inline]
-    pub fn sort_unstable_by<F>(&mut self, compare: F)
+    pub fn sort_unstable_by<F>(&mut self, mut compare: F)
     where
         F: FnMut(&Entity, &Entity) -> core::cmp::Ordering,
     {
-        self.0.sort_unstable_by(compare);
+        self.all.sort_unstable_by(&mut compare);
+        if let Some(active) = self.active.as_mut() {
+            active.sort_unstable_by(&mut compare);
+        }
     }
 
     /// Sorts children [unstably](https://en.wikipedia.org/wiki/Sorting_algorithm#Stability)
@@ -138,12 +185,15 @@ impl Children {
     ///
     /// See also [`sort_unstable_by`](Children::sort_unstable_by).
     #[inline]
-    pub fn sort_unstable_by_key<K, F>(&mut self, compare: F)
+    pub fn sort_unstable_by_key<K, F>(&mut self, mut compare: F)
     where
         F: FnMut(&Entity) -> K,
         K: Ord,
     {
-        self.0.sort_unstable_by_key(compare);
+        self.all.sort_unstable_by_key(&mut compare);
+        if let Some(active) = self.active.as_mut() {
+            active.sort_unstable_by_key(&mut compare);
+        }
     }
 }
 
@@ -152,7 +202,11 @@ impl Deref for Children {
 
     #[inline(always)]
     fn deref(&self) -> &Self::Target {
-        &self.0[..]
+        if let Some(active) = self.active.as_ref() {
+            &active[..]
+        } else {
+            &self.all[..]
+        }
     }
 }
 
@@ -163,6 +217,10 @@ impl<'a> IntoIterator for &'a Children {
 
     #[inline(always)]
     fn into_iter(self) -> Self::IntoIter {
-        self.0.iter()
+        if let Some(active) = self.active.as_ref() {
+            active.iter()
+        } else {
+            self.all.iter()
+        }
     }
 }

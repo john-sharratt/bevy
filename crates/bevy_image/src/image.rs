@@ -11,6 +11,7 @@ use bevy_math::{AspectRatio, UVec2, UVec3, Vec2};
 use bevy_reflect::std_traits::ReflectDefault;
 use bevy_reflect::Reflect;
 use core::hash::Hash;
+use std::borrow::Cow;
 use derive_more::derive::{Display, Error, From};
 use serde::{Deserialize, Serialize};
 use wgpu::{Extent3d, TextureDimension, TextureFormat, TextureViewDescriptor};
@@ -282,7 +283,7 @@ impl ImageFormat {
 #[reflect(opaque)]
 #[reflect(Default, Debug)]
 pub struct Image {
-    pub data: Vec<u8>,
+    pub data: Cow<'static, [u8]>,
     // TODO: this nesting makes accessing Image metadata verbose. Either flatten out descriptor or add accessors
     pub texture_descriptor: wgpu::TextureDescriptor<'static>,
     /// The [`ImageSampler`] to use during rendering.
@@ -638,7 +639,7 @@ impl Default for Image {
         let format = TextureFormat::bevy_default();
         let data = vec![255; format.pixel_size()];
         Image {
-            data,
+            data: data.into(),
             texture_descriptor: wgpu::TextureDescriptor {
                 size: Extent3d {
                     width: 1,
@@ -679,6 +680,37 @@ impl Image {
             "Pixel data, size and format have to match",
         );
         let mut image = Self {
+            data: data.into(),
+            ..Default::default()
+        };
+        image.texture_descriptor.dimension = dimension;
+        image.texture_descriptor.size = size;
+        image.texture_descriptor.format = format;
+        image.asset_usage = asset_usage;
+        image
+    }
+
+    /// Creates a new image from raw binary data and the corresponding metadata.
+    /// (this varient is able to accept static data rather than a vector which
+    ///  ccan be useful for embedding images in the binary for faster load times)
+    ///
+    /// # Panics
+    /// Panics if the length of the `data`, volume of the `size` and the size of the `format`
+    /// do not match.
+    pub fn new_static(
+        size: Extent3d,
+        dimension: TextureDimension,
+        data: impl Into<Cow<'static, [u8]>>,
+        format: TextureFormat,
+        asset_usage: RenderAssetUsages,
+    ) -> Self {
+        let data = data.into();
+        debug_assert_eq!(
+            size.volume() * format.pixel_size(),
+            data.len(),
+            "Pixel data, size and format have to match",
+        );
+        let mut image = Self {
             data,
             ..Default::default()
         };
@@ -700,7 +732,7 @@ impl Image {
         debug_assert!(format.pixel_size() == 4);
         let data = vec![255, 255, 255, 0];
         Image {
-            data,
+            data: data.into(),
             texture_descriptor: wgpu::TextureDescriptor {
                 size: Extent3d {
                     width: 1,
@@ -751,7 +783,7 @@ impl Image {
             value.data.len(),
         );
 
-        for current_pixel in value.data.chunks_exact_mut(pixel.len()) {
+        for current_pixel in value.data.to_mut().chunks_exact_mut(pixel.len()) {
             current_pixel.copy_from_slice(pixel);
         }
         value
@@ -793,7 +825,7 @@ impl Image {
     /// Does not properly resize the contents of the image, but only its internal `data` buffer.
     pub fn resize(&mut self, size: Extent3d) {
         self.texture_descriptor.size = size;
-        self.data.resize(
+        self.data.to_mut().resize(
             size.volume() * self.texture_descriptor.format.pixel_size(),
             0,
         );
@@ -979,7 +1011,7 @@ impl Image {
     pub fn pixel_bytes_mut(&mut self, coords: UVec3) -> Option<&mut [u8]> {
         let len = self.texture_descriptor.format.pixel_size();
         self.pixel_data_offset(coords)
-            .map(|start| &mut self.data[start..(start + len)])
+            .map(|start| &mut self.data.to_mut()[start..(start + len)])
     }
 
     /// Read the color of a specific pixel (1D texture).
