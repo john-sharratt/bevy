@@ -465,7 +465,7 @@ pub fn lut_placeholder() -> Image {
     let format = TextureFormat::Rgba8Unorm;
     let data = vec![255, 0, 255, 255];
     Image {
-        data: Some(data),
+        data: Some(data.into()),
         texture_descriptor: TextureDescriptor {
             size: Extent3d {
                 width: 1,

@@ -13,6 +13,7 @@ use bevy_asset::{Asset, RenderAssetUsages};
 use bevy_color::{Color, ColorToComponents, Gray, LinearRgba, Srgba, Xyza};
 use bevy_math::{AspectRatio, UVec2, UVec3, Vec2};
 use core::hash::Hash;
+use std::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tracing::warn;
@@ -346,7 +347,7 @@ pub struct Image {
     /// If the image is being used as a storage texture which doesn't need to be initialized by the
     /// CPU, then this should be `None`
     /// Otherwise, it should always be `Some`
-    pub data: Option<Vec<u8>>,
+    pub data: Option<Cow<'static, [u8]>>,
     // TODO: this nesting makes accessing Image metadata verbose. Either flatten out descriptor or add accessors
     pub texture_descriptor: TextureDescriptor<Option<&'static str>, &'static [TextureFormat]>,
     /// The [`ImageSampler`] to use during rendering.
@@ -700,7 +701,7 @@ impl Default for Image {
     /// default is a 1x1x1 all '1.0' texture
     fn default() -> Self {
         let mut image = Image::default_uninit();
-        image.data = Some(vec![255; image.texture_descriptor.format.pixel_size()]);
+        image.data = Some(vec![255; image.texture_descriptor.format.pixel_size()].into());
         image
     }
 }
@@ -724,7 +725,7 @@ impl Image {
             "Pixel data, size and format have to match",
         );
         let mut image = Image::new_uninit(size, dimension, format, asset_usage);
-        image.data = Some(data);
+        image.data = Some(data.into());
         image
     }
 
@@ -854,7 +855,7 @@ impl Image {
     pub fn resize(&mut self, size: Extent3d) {
         self.texture_descriptor.size = size;
         if let Some(ref mut data) = self.data {
-            data.resize(
+            data.to_mut().resize(
                 size.volume() * self.texture_descriptor.format.pixel_size(),
                 0,
             );
@@ -1050,6 +1051,7 @@ impl Image {
         let len = self.texture_descriptor.format.pixel_size();
         let offset = self.pixel_data_offset(coords);
         let data = self.data.as_mut()?;
+        let data = data.to_mut();
         offset.map(|start| &mut data[start..(start + len)])
     }
 

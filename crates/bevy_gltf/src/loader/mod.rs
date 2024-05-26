@@ -8,6 +8,7 @@ use std::{
 
 #[cfg(feature = "bevy_animation")]
 use bevy_animation::{prelude::*, AnimationTarget, AnimationTargetId};
+use bevy_asset::AssetPath;
 use bevy_asset::{
     io::Reader, AssetLoadError, AssetLoader, Handle, LoadContext, ReadAssetBytesError,
     RenderAssetUsages,
@@ -44,8 +45,8 @@ use bevy_render::{
     view::Visibility,
 };
 use bevy_scene::Scene;
-#[cfg(not(target_arch = "wasm32"))]
-use bevy_tasks::IoTaskPool;
+//#[cfg(not(target_arch = "wasm32"))]
+//use bevy_tasks::IoTaskPool;
 use bevy_transform::components::Transform;
 
 use gltf::{
@@ -513,6 +514,26 @@ async fn load_gltf<'a, 'b, 'c>(
     // later in the loader when looking up handles for materials. However this would mean
     // that the material's load context would no longer track those images as dependencies.
     let mut _texture_handles = Vec::new();
+
+    // TODO: Remove this and fix the code below it that was commented out
+    // https://github.com/bevyengine/bevy/issues/15271
+    for texture in gltf.textures() {
+        let parent_path = load_context.path().parent().unwrap();
+        let image = load_image(
+            texture,
+            &buffer_data,
+            &linear_textures,
+            parent_path,
+            loader.supported_compressed_formats,
+            settings.load_materials,
+        )
+        .await?;
+        process_loaded_texture(load_context, &mut _texture_handles, image);
+    }
+
+    /*
+     * See https://github.com/bevyengine/bevy/issues/15271 for more details
+     *
     if gltf.textures().len() == 1 || cfg!(target_arch = "wasm32") {
         for texture in gltf.textures() {
             let parent_path = load_context.path().parent().unwrap();
@@ -558,6 +579,7 @@ async fn load_gltf<'a, 'b, 'c>(
                 }
             });
     }
+    */
 
     let mut materials = vec![];
     let mut named_materials = <HashMap<_, _>>::default();
@@ -840,6 +862,7 @@ async fn load_gltf<'a, 'b, 'c>(
 
     let mut scenes = vec![];
     let mut named_scenes = <HashMap<_, _>>::default();
+    let mut lights = Default::default();
     let mut active_camera_found = false;
     for scene in gltf.scenes() {
         let mut err = None;
@@ -861,6 +884,7 @@ async fn load_gltf<'a, 'b, 'c>(
                         &mut node_index_to_entity_map,
                         &mut entity_to_skin_index_map,
                         &mut active_camera_found,
+                        &mut lights,
                         &Transform::default(),
                         #[cfg(feature = "bevy_animation")]
                         &animation_roots,
@@ -939,6 +963,7 @@ async fn load_gltf<'a, 'b, 'c>(
         named_materials,
         nodes,
         named_nodes,
+        lights,
         #[cfg(feature = "bevy_animation")]
         animations,
         #[cfg(feature = "bevy_animation")]
@@ -991,7 +1016,13 @@ async fn load_image<'a, 'b>(
                 .decode_utf8()
                 .unwrap();
             let uri = uri.as_ref();
-            if let Ok(data_uri) = DataUri::parse(uri) {
+            if uri.contains("://") {
+                Ok(ImageOrPath::AssetPath {
+                    path: uri.to_string().into(),
+                    is_srgb,
+                    sampler_descriptor,
+                })
+            } else if let Ok(data_uri) = DataUri::parse(uri) {
                 let bytes = data_uri.decode()?;
                 let image_type = ImageType::MimeType(data_uri.mime_type);
                 Ok(ImageOrPath::Image {
@@ -1276,6 +1307,7 @@ fn load_node(
     node_index_to_entity_map: &mut HashMap<usize, Entity>,
     entity_to_skin_index_map: &mut EntityHashMap<usize>,
     active_camera_found: &mut bool,
+    lights: &mut HashMap<usize, Vec<Entity>>,
     parent_transform: &Transform,
     #[cfg(feature = "bevy_animation")] animation_roots: &HashSet<usize>,
     #[cfg(feature = "bevy_animation")] mut animation_context: Option<AnimationContext>,
@@ -1524,6 +1556,10 @@ fn load_node(
                                 value: extras.get().to_string(),
                             });
                         }
+                        lights
+                            .entry(gltf_node.index())
+                            .or_default()
+                            .push(entity.id());
                     }
                 }
             }
@@ -1540,6 +1576,7 @@ fn load_node(
                 node_index_to_entity_map,
                 entity_to_skin_index_map,
                 active_camera_found,
+                lights,
                 &world_transform,
                 #[cfg(feature = "bevy_animation")]
                 animation_roots,
@@ -1661,6 +1698,11 @@ enum ImageOrPath {
         is_srgb: bool,
         sampler_descriptor: ImageSamplerDescriptor,
     },
+    AssetPath {
+        path: AssetPath<'static>,
+        is_srgb: bool,
+        sampler_descriptor: ImageSamplerDescriptor,
+    },
 }
 
 impl ImageOrPath {
@@ -1677,6 +1719,18 @@ impl ImageOrPath {
         let handle = match self {
             ImageOrPath::Image { label, image } => {
                 load_context.add_labeled_asset(label.to_string(), image)
+            }
+            ImageOrPath::AssetPath {
+                path,
+                is_srgb,
+                sampler_descriptor,
+            } => load_context
+                .loader()
+                .with_settings(move |settings: &mut ImageLoaderSettings| {
+                    settings.is_srgb = is_srgb;
+                    settings.sampler = ImageSampler::Descriptor(sampler_descriptor.clone());
+                })
+                .load(path),
             }
             ImageOrPath::Path {
                 path,

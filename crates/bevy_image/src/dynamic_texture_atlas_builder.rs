@@ -1,4 +1,5 @@
 use crate::{Image, TextureAtlasLayout, TextureFormatPixelInfo as _};
+use std::borrow::Cow;
 use bevy_asset::RenderAssetUsages;
 use bevy_math::{URect, UVec2};
 use guillotiere::{size2, Allocation, AtlasAllocator};
@@ -101,6 +102,14 @@ impl DynamicTextureAtlasBuilder {
             let texture_begin = texture_y * rect_width * format_size;
             let texture_end = texture_begin + rect_width * format_size;
             atlas_data[begin..end].copy_from_slice(&data[texture_begin..texture_end]);
+
+            if let Cow::Owned(atlas_data) = &mut atlas_data {
+                atlas_data[begin..end].copy_from_slice(&texture.data[texture_begin..texture_end]);
+            } else {
+                let mut data = atlas_data.clone().into_owned();
+                data[begin..end].copy_from_slice(&texture.data[texture_begin..texture_end]);
+                *atlas_data = Cow::Owned(data);
+            }
         }
         Ok(())
     }

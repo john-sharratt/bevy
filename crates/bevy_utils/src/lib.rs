@@ -25,6 +25,7 @@ pub mod prelude {
 pub mod synccell;
 pub mod syncunsafecell;
 
+mod cow_arc;
 mod default;
 mod once;
 #[cfg(feature = "std")]
@@ -32,6 +33,8 @@ mod parallel_queue;
 
 #[doc(hidden)]
 pub use once::OnceFlag;
+
+pub use cow_arc::*;
 
 pub use default::default;
 

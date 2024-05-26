@@ -55,8 +55,8 @@ pub trait ErasedAssetLoader: Send + Sync + 'static {
     /// Asynchronously loads the asset(s) from the bytes provided by [`Reader`].
     fn load<'a>(
         &'a self,
-        reader: &'a mut dyn Reader,
-        meta: &'a dyn AssetMetaDyn,
+        reader: &'a mut dyn Reader,        
+        meta: Box<dyn AssetMetaDyn>,
         load_context: LoadContext<'a>,
     ) -> BoxedFuture<
         'a,
@@ -140,7 +140,7 @@ where
 }
 
 pub(crate) struct LabeledAsset {
-    pub(crate) asset: ErasedLoadedAsset,
+    pub(crate) asset: Option<ErasedLoadedAsset>,
     pub(crate) handle: UntypedHandle,
 }
 
@@ -185,7 +185,9 @@ impl<A: Asset> LoadedAsset<A> {
         &self,
         label: impl Into<CowArc<'static, str>>,
     ) -> Option<&ErasedLoadedAsset> {
-        self.labeled_assets.get(&label.into()).map(|a| &a.asset)
+        self.labeled_assets
+            .get(&label.into())
+            .and_then(|a| a.asset.as_ref())
     }
 
     /// Iterate over all labels for "labeled assets" in the loaded asset
@@ -246,7 +248,9 @@ impl ErasedLoadedAsset {
         &self,
         label: impl Into<CowArc<'static, str>>,
     ) -> Option<&ErasedLoadedAsset> {
-        self.labeled_assets.get(&label.into()).map(|a| &a.asset)
+        self.labeled_assets
+            .get(&label.into())
+            .and_then(|a| a.asset.as_ref())
     }
 
     /// Iterate over all labels for "labeled assets" in the loaded asset
@@ -419,6 +423,21 @@ impl<'a> LoadContext<'a> {
         self.labeled_asset_scope(label, |_| asset)
     }
 
+    /// This will add the given `asset` as a "labeled [`Asset`]" with the `label` label
+    /// that is not owned by this particular container but another
+    ///
+    /// See [`AssetPath`] for more on labeled assets.
+    pub fn add_labeled_asset_handle<A: Asset>(&mut self, label: String, handle: Handle<A>) {
+        let untyped = handle.clone().untyped();
+        self.labeled_assets
+            .entry(label.into())
+            .or_insert_with(|| LabeledAsset {
+                asset: None,
+                handle: untyped,
+            })
+            .handle = handle.untyped();
+    }
+
     /// Add a [`LoadedAsset`] that is a "labeled sub asset" of the root path of this load context.
     /// This can be used in combination with [`LoadContext::begin_labeled_asset`] to parallelize
     /// sub asset loading.
@@ -438,7 +457,7 @@ impl<'a> LoadContext<'a> {
         self.labeled_assets.insert(
             label,
             LabeledAsset {
-                asset: loaded_asset,
+                asset: Some(loaded_asset),
                 handle: handle.clone().untyped(),
             },
         );

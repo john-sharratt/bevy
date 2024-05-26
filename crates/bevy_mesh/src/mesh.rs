@@ -1532,7 +1532,7 @@ mod tests {
         .map(Vec3::from_array)
         .collect();
         mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions.clone());
-        mesh.insert_indices(Indices::U32(vec![0, 1, 2, 3, 4, 5]));
+        mesh.insert_indices(Indices::U32((&[0, 1, 2, 3, 4, 5]).into()));
         assert_eq!(
             vec![
                 Triangle3d {

@@ -203,6 +203,12 @@ impl Data {
             Value::Static(value) => value,
         }
     }
+    fn static_bytes(&self) -> Option<&'static [u8]> {
+        match &self.value {
+            Value::Vec(_) => None,
+            Value::Static(value) => Some(value),
+        }
+    }
 }
 
 impl From<Vec<u8>> for Value {
@@ -283,6 +289,10 @@ impl Reader for DataReader {
                 Ok(n)
             }
         })
+    }
+
+    fn as_static_bytes(&self) -> Option<&'static [u8]> {
+        self.data.static_bytes()
     }
 }
 

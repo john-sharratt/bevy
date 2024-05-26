@@ -96,7 +96,7 @@ impl AsAssetId for Mesh2d {
 ///     ));
 /// }
 /// ```
-#[derive(Component, Clone, Debug, Default, Deref, DerefMut, Reflect, PartialEq, Eq, From)]
+#[derive(Component, Clone, Debug, Default, Deref, DerefMut, Reflect, PartialEq, Eq, Hash, From)]
 #[reflect(Component, Default, Clone, PartialEq)]
 #[require(Transform, Visibility, VisibilityClass)]
 #[component(on_add = view::add_visibility_class::<Mesh3d>)]
