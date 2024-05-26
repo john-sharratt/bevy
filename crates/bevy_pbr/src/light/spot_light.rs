@@ -29,6 +29,8 @@ pub struct SpotLight {
     /// Light is attenuated from `inner_angle` to `outer_angle` to give a smooth falloff.
     /// `inner_angle` should be <= `outer_angle`
     pub inner_angle: f32,
+    /// Is the light switched on or not
+    pub turned_on: bool,
 }
 
 impl SpotLight {
@@ -52,6 +54,7 @@ impl Default for SpotLight {
             shadow_normal_bias: Self::DEFAULT_SHADOW_NORMAL_BIAS,
             inner_angle: 0.0,
             outer_angle: std::f32::consts::FRAC_PI_4,
+            turned_on: true,
         }
     }
 }

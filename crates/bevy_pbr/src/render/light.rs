@@ -239,6 +239,9 @@ pub fn extract_lights(
         if !view_visibility.get() {
             continue;
         }
+        if !point_light.turned_on {
+            continue;
+        }
         // TODO: This is very much not ideal. We should be able to re-use the vector memory.
         // However, since exclusive access to the main world in extract is ill-advised, we just clone here.
         let render_cubemap_visible_entities = cubemap_visible_entities.clone();
@@ -277,6 +280,9 @@ pub fn extract_lights(
             spot_lights.get(entity)
         {
             if !view_visibility.get() {
+                continue;
+            }
+            if !spot_light.turned_on {
                 continue;
             }
             // TODO: This is very much not ideal. We should be able to re-use the vector memory.

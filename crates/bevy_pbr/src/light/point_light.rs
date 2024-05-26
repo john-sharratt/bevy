@@ -45,6 +45,8 @@ pub struct PointLight {
     /// shadow map's texel size so that it can be small close to the camera and gets larger further
     /// away.
     pub shadow_normal_bias: f32,
+    /// Is the light switched on or not
+    pub turned_on: bool,
 }
 
 impl Default for PointLight {
@@ -60,6 +62,7 @@ impl Default for PointLight {
             shadows_enabled: false,
             shadow_depth_bias: Self::DEFAULT_SHADOW_DEPTH_BIAS,
             shadow_normal_bias: Self::DEFAULT_SHADOW_NORMAL_BIAS,
+            turned_on: true,
         }
     }
 }

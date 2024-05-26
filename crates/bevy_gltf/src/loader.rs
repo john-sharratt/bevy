@@ -5,6 +5,7 @@ use crate::{
 
 #[cfg(feature = "bevy_animation")]
 use bevy_animation::{AnimationTarget, AnimationTargetId};
+use bevy_asset::AssetPath;
 use bevy_asset::{
     io::Reader, AssetLoadError, AssetLoader, AsyncReadExt, Handle, LoadContext, ReadAssetBytesError,
 };
@@ -351,6 +352,17 @@ async fn load_gltf<'a, 'b, 'c>(
             ImageOrPath::Image { label, image } => {
                 load_context.add_labeled_asset(label.to_string(), image)
             }
+            ImageOrPath::AssetPath {
+                path,
+                is_srgb,
+                sampler_descriptor,
+            } => load_context
+                .loader()
+                .with_settings(move |settings: &mut ImageLoaderSettings| {
+                    settings.is_srgb = is_srgb;
+                    settings.sampler = ImageSampler::Descriptor(sampler_descriptor.clone());
+                })
+                .load(path),
             ImageOrPath::Path {
                 path,
                 is_srgb,
@@ -619,9 +631,11 @@ async fn load_gltf<'a, 'b, 'c>(
             let reader = gltf_skin.reader(|buffer| Some(&buffer_data[buffer.index()]));
             let local_to_bone_bind_matrices: Vec<Mat4> = reader
                 .read_inverse_bind_matrices()
-                .unwrap()
-                .map(|mat| Mat4::from_cols_array_2d(&mat))
-                .collect();
+                .map(|mat| {
+                    mat.map(|mat| Mat4::from_cols_array_2d(&mat))
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_else(|| vec![Mat4::IDENTITY]);
 
             load_context.add_labeled_asset(
                 skin_label(&gltf_skin),
@@ -632,6 +646,7 @@ async fn load_gltf<'a, 'b, 'c>(
 
     let mut scenes = vec![];
     let mut named_scenes = HashMap::default();
+    let mut lights = Default::default();
     let mut active_camera_found = false;
     for scene in gltf.scenes() {
         let mut err = None;
@@ -653,6 +668,7 @@ async fn load_gltf<'a, 'b, 'c>(
                         &mut node_index_to_entity_map,
                         &mut entity_to_skin_index_map,
                         &mut active_camera_found,
+                        &mut lights,
                         &Transform::default(),
                         #[cfg(feature = "bevy_animation")]
                         &animation_roots,
@@ -737,6 +753,7 @@ async fn load_gltf<'a, 'b, 'c>(
         named_materials,
         nodes,
         named_nodes,
+        lights,
         #[cfg(feature = "bevy_animation")]
         animations,
         #[cfg(feature = "bevy_animation")]
@@ -841,7 +858,13 @@ async fn load_image<'a, 'b>(
                 .decode_utf8()
                 .unwrap();
             let uri = uri.as_ref();
-            if let Ok(data_uri) = DataUri::parse(uri) {
+            if uri.contains("://") {
+                Ok(ImageOrPath::AssetPath {
+                    path: uri.to_string().into(),
+                    is_srgb,
+                    sampler_descriptor,
+                })
+            } else if let Ok(data_uri) = DataUri::parse(uri) {
                 let bytes = data_uri.decode()?;
                 let image_type = ImageType::MimeType(data_uri.mime_type);
                 Ok(ImageOrPath::Image {
@@ -1168,6 +1191,7 @@ fn load_node(
     node_index_to_entity_map: &mut HashMap<usize, Entity>,
     entity_to_skin_index_map: &mut EntityHashMap<usize>,
     active_camera_found: &mut bool,
+    lights: &mut HashMap<usize, Vec<Entity>>,
     parent_transform: &Transform,
     #[cfg(feature = "bevy_animation")] animation_roots: &HashSet<usize>,
     #[cfg(feature = "bevy_animation")] mut animation_context: Option<AnimationContext>,
@@ -1419,6 +1443,7 @@ fn load_node(
                                 value: extras.get().to_string(),
                             });
                         }
+                        lights.entry(gltf_node.index()).or_default().push(entity.id());
                     }
                 }
             }
@@ -1435,6 +1460,7 @@ fn load_node(
                 node_index_to_entity_map,
                 entity_to_skin_index_map,
                 active_camera_found,
+                lights,
                 &world_transform,
                 #[cfg(feature = "bevy_animation")]
                 animation_roots,
@@ -1500,7 +1526,9 @@ fn texture_handle(load_context: &mut LoadContext, texture: &gltf::Texture) -> Ha
                 .decode_utf8()
                 .unwrap();
             let uri = uri.as_ref();
-            if let Ok(_data_uri) = DataUri::parse(uri) {
+            if uri.contains("://") {
+                load_context.load(uri.to_string())
+            } else if let Ok(_data_uri) = DataUri::parse(uri) {
                 load_context.get_label_handle(GltfAssetLabel::Texture(texture.index()).to_string())
             } else {
                 let parent = load_context.path().parent().unwrap();
@@ -1715,6 +1743,11 @@ enum ImageOrPath {
     },
     Path {
         path: PathBuf,
+        is_srgb: bool,
+        sampler_descriptor: ImageSamplerDescriptor,
+    },
+    AssetPath {
+        path: AssetPath<'static>,
         is_srgb: bool,
         sampler_descriptor: ImageSamplerDescriptor,
     },

@@ -86,10 +86,11 @@ impl<A: Asset> TransformedAsset<A> {
         Q: ?Sized + Hash + Eq,
     {
         let labeled = self.labeled_assets.get_mut(label)?;
-        let value = labeled.asset.value.downcast_mut::<B>()?;
+        let asset = labeled.asset.as_mut()?;
+        let value = asset.value.downcast_mut::<B>()?;
         Some(TransformedSubAsset {
             value,
-            labeled_assets: &mut labeled.asset.labeled_assets,
+            labeled_assets: &mut asset.labeled_assets,
         })
     }
     /// Returns the type-erased labeled asset, if it exists and matches this type.
@@ -99,7 +100,7 @@ impl<A: Asset> TransformedAsset<A> {
         Q: ?Sized + Hash + Eq,
     {
         let labeled = self.labeled_assets.get(label)?;
-        Some(&labeled.asset)
+        labeled.asset.as_ref()
     }
     /// Returns the [`UntypedHandle`] of the labeled asset with the provided 'label', if it exists.
     pub fn get_untyped_handle<Q>(&self, label: &Q) -> Option<UntypedHandle>
@@ -130,7 +131,7 @@ impl<A: Asset> TransformedAsset<A> {
         asset: impl Into<ErasedLoadedAsset>,
     ) {
         let labeled = LabeledAsset {
-            asset: asset.into(),
+            asset: Some(asset.into()),
             handle: handle.into(),
         };
         self.labeled_assets.insert(label.into(), labeled);
@@ -186,10 +187,11 @@ impl<'a, A: Asset> TransformedSubAsset<'a, A> {
         Q: ?Sized + Hash + Eq,
     {
         let labeled = self.labeled_assets.get_mut(label)?;
-        let value = labeled.asset.value.downcast_mut::<B>()?;
+        let asset = labeled.asset.as_mut()?;
+        let value = asset.value.downcast_mut::<B>()?;
         Some(TransformedSubAsset {
             value,
-            labeled_assets: &mut labeled.asset.labeled_assets,
+            labeled_assets: &mut asset.labeled_assets,
         })
     }
     /// Returns the type-erased labeled asset, if it exists and matches this type.
@@ -199,7 +201,7 @@ impl<'a, A: Asset> TransformedSubAsset<'a, A> {
         Q: ?Sized + Hash + Eq,
     {
         let labeled = self.labeled_assets.get(label)?;
-        Some(&labeled.asset)
+        labeled.asset.as_ref()
     }
     /// Returns the [`UntypedHandle`] of the labeled asset with the provided 'label', if it exists.
     pub fn get_untyped_handle<Q>(&self, label: &Q) -> Option<UntypedHandle>
@@ -230,7 +232,7 @@ impl<'a, A: Asset> TransformedSubAsset<'a, A> {
         asset: impl Into<ErasedLoadedAsset>,
     ) {
         let labeled = LabeledAsset {
-            asset: asset.into(),
+            asset: Some(asset.into()),
             handle: handle.into(),
         };
         self.labeled_assets.insert(label.into(), labeled);

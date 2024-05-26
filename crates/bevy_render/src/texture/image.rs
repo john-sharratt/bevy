@@ -17,7 +17,7 @@ use bevy_ecs::system::{lifetimeless::SRes, Resource, SystemParamItem};
 use bevy_math::{AspectRatio, UVec2, Vec2};
 use bevy_reflect::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::hash::Hash;
+use std::{borrow::Cow, hash::Hash};
 use thiserror::Error;
 use wgpu::{Extent3d, TextureDimension, TextureFormat, TextureViewDescriptor};
 
@@ -134,7 +134,7 @@ impl ImageFormat {
 #[derive(Asset, Reflect, Debug, Clone)]
 #[reflect_value(Default)]
 pub struct Image {
-    pub data: Vec<u8>,
+    pub data: Cow<'static, [u8]>,
     // TODO: this nesting makes accessing Image metadata verbose. Either flatten out descriptor or add accessors
     pub texture_descriptor: wgpu::TextureDescriptor<'static>,
     /// The [`ImageSampler`] to use during rendering.
@@ -480,7 +480,7 @@ impl Default for Image {
         let format = TextureFormat::bevy_default();
         let data = vec![255; format.pixel_size()];
         Image {
-            data,
+            data: data.into(),
             texture_descriptor: wgpu::TextureDescriptor {
                 size: Extent3d {
                     width: 1,
@@ -515,6 +515,23 @@ impl Image {
         format: TextureFormat,
         asset_usage: RenderAssetUsages,
     ) -> Self {
+        Self::new_from(size, dimension, data, format, asset_usage)
+    }
+
+    /// Creates a new image from raw binary data and the corresponding metadata.
+    ///
+    /// # Panics
+    /// Panics if the length of the `data`, volume of the `size` and the size of the `format`
+    /// do not match.
+    pub fn new_from<C>(
+        size: Extent3d,
+        dimension: TextureDimension,
+        data: C,
+        format: TextureFormat,
+        asset_usage: RenderAssetUsages,
+    ) -> Self
+    where C: Into<Cow<'static, [u8]>> {
+        let data: Cow<'static, [u8]> = data.into();
         debug_assert_eq!(
             size.volume() * format.pixel_size(),
             data.len(),
@@ -542,7 +559,7 @@ impl Image {
         debug_assert!(format.pixel_size() == 4);
         let data = vec![255, 255, 255, 0];
         Image {
-            data,
+            data: data.into(),
             texture_descriptor: wgpu::TextureDescriptor {
                 size: Extent3d {
                     width: 1,
@@ -593,7 +610,12 @@ impl Image {
             value.data.len(),
         );
 
-        for current_pixel in value.data.chunks_exact_mut(pixel.len()) {
+        for current_pixel in value
+            .data
+            .clone()
+            .into_owned()
+            .chunks_exact_mut(pixel.len())
+        {
             current_pixel.copy_from_slice(pixel);
         }
         value
@@ -633,10 +655,19 @@ impl Image {
     /// Does not properly resize the contents of the image, but only its internal `data` buffer.
     pub fn resize(&mut self, size: Extent3d) {
         self.texture_descriptor.size = size;
-        self.data.resize(
-            size.volume() * self.texture_descriptor.format.pixel_size(),
-            0,
-        );
+        if let Cow::Owned(data) = &mut self.data {
+            data.resize(
+                size.volume() * self.texture_descriptor.format.pixel_size(),
+                0,
+            );
+        } else {
+            let mut data = self.data.clone().into_owned();
+            data.resize(
+                size.volume() * self.texture_descriptor.format.pixel_size(),
+                0,
+            );
+            self.data = data.into();
+        }
     }
 
     /// Changes the `size`, asserting that the total number of data elements (pixels) remains the
