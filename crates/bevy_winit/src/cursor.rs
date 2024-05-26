@@ -194,7 +194,7 @@ fn on_remove_cursor_icon(trigger: Trigger<OnRemove, CursorIcon>, mut commands: C
 #[cfg(feature = "custom_cursor")]
 /// Returns the image data as a `Vec<u8>`.
 /// Only supports rgba8 and rgba32float formats.
-fn image_to_rgba_pixels(image: &Image) -> Option<Vec<u8>> {
+fn image_to_rgba_pixels(image: &Image) -> Option<std::borrow::Cow<'static, [u8]>> {
     match image.texture_descriptor.format {
         TextureFormat::Rgba8Unorm
         | TextureFormat::Rgba8UnormSrgb
@@ -210,7 +210,8 @@ fn image_to_rgba_pixels(image: &Image) -> Option<Vec<u8>> {
                     let num = bytemuck::cast_ref::<[u8; 4], f32>(chunk);
                     (num * 255.0) as u8
                 })
-                .collect(),
+                .collect::<Vec<_>>()
+                .into(),
         ),
         _ => None,
     }

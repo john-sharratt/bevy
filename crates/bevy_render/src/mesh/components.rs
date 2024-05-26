@@ -80,7 +80,7 @@ impl From<&Mesh2d> for AssetId<Mesh> {
 ///     ));
 /// }
 /// ```
-#[derive(Component, Clone, Debug, Default, Deref, DerefMut, Reflect, PartialEq, Eq, From)]
+#[derive(Component, Clone, Debug, Default, Deref, DerefMut, Reflect, PartialEq, Eq, Hash, From)]
 #[reflect(Component, Default)]
 #[require(Transform, Visibility)]
 pub struct Mesh3d(pub Handle<Mesh>);

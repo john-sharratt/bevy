@@ -691,7 +691,9 @@ impl AssetServer {
     /// labeled assets.
     fn send_loaded_asset(&self, id: UntypedAssetId, mut loaded_asset: ErasedLoadedAsset) {
         for (_, labeled_asset) in loaded_asset.labeled_assets.drain() {
-            self.send_loaded_asset(labeled_asset.handle.id(), labeled_asset.asset);
+            if let Some(asset) = labeled_asset.asset {    
+                self.send_loaded_asset(labeled_asset.handle.id(), asset);
+            }
         }
 
         self.send_asset_event(InternalAssetEvent::Loaded { id, loaded_asset });

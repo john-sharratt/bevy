@@ -795,7 +795,7 @@ impl Mesh {
         // The indices of `other` should start after the last vertex of `self`.
         let index_offset = self
             .attribute(Mesh::ATTRIBUTE_POSITION)
-            .get_or_insert(&Float32x3(Vec::default()))
+            .get_or_insert(&Float32x3(Vec::default().into()))
             .len();
 
         // Extend attributes of `self` with attributes of `other`.
@@ -1475,7 +1475,7 @@ mod tests {
         .map(Vec3::from_array)
         .collect();
         mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions.clone());
-        mesh.insert_indices(Indices::U32(vec![0, 1, 2, 3, 4, 5]));
+        mesh.insert_indices(Indices::U32((&[0, 1, 2, 3, 4, 5]).into()));
         assert_eq!(
             vec![
                 Triangle3d {

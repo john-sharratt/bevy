@@ -41,9 +41,10 @@ impl AssetLoader for HdrTextureLoader {
             "Format should have 32bit x 4 size"
         );
 
-        let mut bytes = Vec::new();
-        reader.read_to_end(&mut bytes).await?;
-        let decoder = image::codecs::hdr::HdrDecoder::new(bytes.as_slice())?;
+        let bytes = reader.read_to_cow().await?;
+        let mut bytes = bytes.as_ref();
+
+        let decoder = image::codecs::hdr::HdrDecoder::new(&mut bytes)?;
         let info = decoder.metadata();
         let dynamic_image = DynamicImage::from_decoder(decoder)?;
         let image_buffer = dynamic_image

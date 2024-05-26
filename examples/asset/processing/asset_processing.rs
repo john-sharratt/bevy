@@ -84,15 +84,15 @@ impl AssetLoader for TextLoader {
     async fn load(
         &self,
         reader: &mut dyn Reader,
+        bytes: Option<&[u8]>,
         settings: &TextSettings,
         _load_context: &mut LoadContext<'_>,
     ) -> Result<Text, Self::Error> {
-        let mut bytes = Vec::new();
-        reader.read_to_end(&mut bytes).await?;
+        let bytes = reader.read_to_cow().await?;
         let value = if let Some(ref text) = settings.text_override {
             text.clone()
         } else {
-            String::from_utf8(bytes).unwrap()
+            String::from_utf8(&bytes).unwrap()
         };
         Ok(Text(value))
     }
@@ -138,11 +138,11 @@ impl AssetLoader for CoolTextLoader {
     async fn load(
         &self,
         reader: &mut dyn Reader,
+        bytes: Option<&[u8]>,
         _settings: &Self::Settings,
         load_context: &mut LoadContext<'_>,
     ) -> Result<CoolText, Self::Error> {
-        let mut bytes = Vec::new();
-        reader.read_to_end(&mut bytes).await?;
+        let bytes = reader.read_to_cow().await?;
         let ron: CoolTextRon = ron::de::from_bytes(&bytes)?;
         let mut base_text = ron.text;
         for embedded in ron.embedded_dependencies {

@@ -500,7 +500,7 @@ fn update(
                         * img_bytes.texture_descriptor.format.pixel_size();
                     let aligned_row_bytes = RenderDevice::align_copy_bytes_per_row(row_bytes);
                     if row_bytes == aligned_row_bytes {
-                        img_bytes.data.clone_from(&image_data);
+                        img_bytes.data.to_mut().clone_from(&image_data);
                     } else {
                         // shrink data to original image size
                         img_bytes.data = image_data

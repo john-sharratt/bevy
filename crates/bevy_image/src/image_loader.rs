@@ -127,8 +127,8 @@ impl AssetLoader for ImageLoader {
         settings: &ImageLoaderSettings,
         load_context: &mut LoadContext<'_>,
     ) -> Result<Image, Self::Error> {
-        let mut bytes = Vec::new();
-        reader.read_to_end(&mut bytes).await?;
+        let bytes = reader.read_to_cow().await?;
+
         let image_type = match settings.format {
             ImageFormatSetting::FromExtension => {
                 // use the file extension for the image type
