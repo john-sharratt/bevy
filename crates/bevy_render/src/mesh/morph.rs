@@ -82,7 +82,7 @@ impl MorphTargetImage {
                 component_count,
             });
         };
-        let data = targets
+        let data: Vec<_> = targets
             .flat_map(|mut attributes| {
                 let layer_byte_count = (padding + component_count) as usize * mem::size_of::<f32>();
                 let mut buffer = Vec::with_capacity(layer_byte_count);
