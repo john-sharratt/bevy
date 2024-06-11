@@ -474,19 +474,21 @@ impl Image {
     /// # Panics
     /// Panics if the length of the `data`, volume of the `size` and the size of the `format`
     /// do not match.
-    pub fn new(
+    pub fn new<C>(
         size: Extent3d,
         dimension: TextureDimension,
-        data: Vec<u8>,
+        data: C,
         format: TextureFormat,
-    ) -> Self {
+    ) -> Self
+    where C: Into<Cow<'static, [u8]>> {
+        let data: Cow<'static, [u8]> = data.into();
         debug_assert_eq!(
             size.volume() * format.pixel_size(),
             data.len(),
             "Pixel data, size and format have to match",
         );
         let mut image = Self {
-            data: data.into(),
+            data,
             ..Default::default()
         };
         image.texture_descriptor.dimension = dimension;
