@@ -320,7 +320,7 @@ pub struct LoadContext<'a> {
 
 impl<'a> LoadContext<'a> {
     /// Creates a new [`LoadContext`] instance.
-    pub(crate) fn new(
+    pub fn new(
         asset_server: &'a AssetServer,
         asset_path: AssetPath<'static>,
         should_load_dependencies: bool,

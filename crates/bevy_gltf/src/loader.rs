@@ -54,7 +54,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::{value, Value};
 #[cfg(feature = "bevy_animation")]
 use smallvec::SmallVec;
-use std::io::Error;
 use std::{
     collections::VecDeque,
     path::{Path, PathBuf},
@@ -188,7 +187,7 @@ impl AssetLoader for GltfLoader {
 }
 
 /// Loads an entire glTF file.
-async fn load_gltf<'a, 'b, 'c>(
+pub async fn load_gltf<'a, 'b, 'c>(
     loader: &GltfLoader,
     bytes: &'a [u8],
     load_context: &'b mut LoadContext<'c>,
@@ -199,11 +198,7 @@ async fn load_gltf<'a, 'b, 'c>(
         .asset_path()
         .path()
         .to_str()
-        .ok_or(GltfError::Gltf(gltf::Error::Io(Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "Gltf file name invalid",
-        ))))?
-        .to_string();
+        .map(|f| f.to_string());
     let buffer_data = load_buffers(&gltf, load_context).await?;
 
     let mut linear_textures = HashSet::default();
@@ -544,7 +539,7 @@ async fn load_gltf<'a, 'b, 'c>(
                 && material_needs_tangents(&primitive.material())
             {
                 bevy_utils::tracing::debug!(
-                    "Missing vertex tangents for {}, computing them using the mikktspace algorithm. Consider using a tool such as Blender to pre-compute the tangents.", file_name
+                    "Missing vertex tangents for {:?}, computing them using the mikktspace algorithm. Consider using a tool such as Blender to pre-compute the tangents.", file_name
                 );
 
                 let generate_tangents_span = info_span!("generate_tangents", name = file_name);
