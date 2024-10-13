@@ -5,6 +5,7 @@ use crate::{
 
 #[cfg(feature = "bevy_animation")]
 use bevy_animation::{AnimationTarget, AnimationTargetId};
+use bevy_asset::AssetPath;
 use bevy_asset::{
     io::Reader, AssetLoadError, AssetLoader, AsyncReadExt, Handle, LoadContext, ReadAssetBytesError,
 };
@@ -351,6 +352,17 @@ async fn load_gltf<'a, 'b, 'c>(
             ImageOrPath::Image { label, image } => {
                 load_context.add_labeled_asset(label.to_string(), image)
             }
+            ImageOrPath::AssetPath {
+                path,
+                is_srgb,
+                sampler_descriptor,
+            } => load_context
+                .loader()
+                .with_settings(move |settings: &mut ImageLoaderSettings| {
+                    settings.is_srgb = is_srgb;
+                    settings.sampler = ImageSampler::Descriptor(sampler_descriptor.clone());
+                })
+                .load(path),
             ImageOrPath::Path {
                 path,
                 is_srgb,
@@ -840,7 +852,13 @@ async fn load_image<'a, 'b>(
                 .decode_utf8()
                 .unwrap();
             let uri = uri.as_ref();
-            if let Ok(data_uri) = DataUri::parse(uri) {
+            if uri.starts_with("embedded://") {
+                Ok(ImageOrPath::AssetPath {
+                    path: uri.to_string().into(),
+                    is_srgb,
+                    sampler_descriptor,
+                })
+            } else if let Ok(data_uri) = DataUri::parse(uri) {
                 let bytes = data_uri.decode()?;
                 let image_type = ImageType::MimeType(data_uri.mime_type);
                 Ok(ImageOrPath::Image {
@@ -1499,7 +1517,9 @@ fn texture_handle(load_context: &mut LoadContext, texture: &gltf::Texture) -> Ha
                 .decode_utf8()
                 .unwrap();
             let uri = uri.as_ref();
-            if let Ok(_data_uri) = DataUri::parse(uri) {
+            if uri.starts_with("embedded://") {
+                load_context.load(uri.to_string())
+            } else if let Ok(_data_uri) = DataUri::parse(uri) {
                 load_context.get_label_handle(GltfAssetLabel::Texture(texture.index()).to_string())
             } else {
                 let parent = load_context.path().parent().unwrap();
@@ -1717,6 +1737,11 @@ enum ImageOrPath {
         is_srgb: bool,
         sampler_descriptor: ImageSamplerDescriptor,
     },
+    AssetPath {
+        path: AssetPath<'static>,
+        is_srgb: bool,
+        sampler_descriptor: ImageSamplerDescriptor,
+    }
 }
 
 struct DataUri<'a> {
