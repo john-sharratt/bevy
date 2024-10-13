@@ -9,7 +9,7 @@ use bevy_utils::tracing::warn;
 use bevy_utils::{Entry, HashMap, HashSet, TypeIdMap};
 use crossbeam_channel::Sender;
 use std::{
-    any::TypeId,
+    any::{Any, TypeId},
     sync::{Arc, Weak},
 };
 use thiserror::Error;
@@ -180,6 +180,16 @@ impl AssetInfos {
         );
         // it is ok to unwrap because TypeId was specified above
         unwrap_with_context(result, type_name).unwrap()
+    }
+
+    // Adds a path handle that was loaded externally to the asset server
+    pub fn add<A: Asset>(
+        &mut self,
+        path: AssetPath<'static>,
+        handle: Handle<A>,
+    ) {
+        let handles = self.path_to_id.entry(path.clone()).or_default();
+        handles.insert(handle.type_id(), handle.untyped().id());
     }
 
     /// Retrieves asset tracking data, or creates it if it doesn't exist.

@@ -626,6 +626,17 @@ impl AssetServer {
         }
     }
 
+    /// Adds an asset to the server that was loaded externally
+    pub fn add_loaded_asset<A: Asset>(
+        &self,
+        path: AssetPath<'static>,
+        handle: Handle<A>)
+    {
+        let id = handle.clone().untyped().id();
+        self.data.infos.write().add(path, handle);
+        self.send_asset_event(InternalAssetEvent::LoadedWithDependencies { id });
+    }
+
     /// Sends a load event for the given `loaded_asset` and does the same recursively for all
     /// labeled assets.
     fn send_loaded_asset(&self, id: UntypedAssetId, mut loaded_asset: ErasedLoadedAsset) {
