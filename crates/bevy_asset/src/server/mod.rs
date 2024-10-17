@@ -677,25 +677,6 @@ impl AssetServer {
         self.load_asset(LoadedAsset::new_with_dependencies(asset, None))
     }
 
-    /// Queues a new asset to be tracked by the [`AssetServer`] and returns a [`Handle`] to it. This can be used to track
-    /// dependencies of assets created at runtime.
-    ///
-    /// After the asset has been fully loaded by the [`AssetServer`], it will show up in the relevant [`Assets`] storage.
-    #[must_use = "not using the returned strong handle may result in the unexpected release of the asset"]
-    pub fn add_with_path<A: Asset>(&self, asset: A, path: AssetPath<'static>) -> Handle<A> {
-        let loaded_asset: LoadedAsset<A> = LoadedAsset::new_with_dependencies(asset, None).into();
-        let erased_loaded_asset: ErasedLoadedAsset = loaded_asset.into();
-        self.load_asset_untyped(Some(path), erased_loaded_asset)
-            .typed_debug_checked()
-    }
-
-    /// Duplicates the object under another path
-    pub fn duplicate_to_path<A: Asset>(&self, handle: Handle<A>, path: AssetPath<'static>) {
-        let mut guard = self.data.infos.write();
-        let handles = guard.path_to_id.entry(path.clone()).or_default();
-        handles.insert(handle.clone().untyped().type_id(), handle.untyped().id());
-    }
-
     pub(crate) fn load_asset<A: Asset>(&self, asset: impl Into<LoadedAsset<A>>) -> Handle<A> {
         let loaded_asset: LoadedAsset<A> = asset.into();
         let erased_loaded_asset: ErasedLoadedAsset = loaded_asset.into();
