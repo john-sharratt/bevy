@@ -852,7 +852,7 @@ async fn load_image<'a, 'b>(
                 .decode_utf8()
                 .unwrap();
             let uri = uri.as_ref();
-            if uri.starts_with("embedded://") {
+            if uri.contains("://") {
                 Ok(ImageOrPath::AssetPath {
                     path: uri.to_string().into(),
                     is_srgb,
@@ -1517,7 +1517,7 @@ fn texture_handle(load_context: &mut LoadContext, texture: &gltf::Texture) -> Ha
                 .decode_utf8()
                 .unwrap();
             let uri = uri.as_ref();
-            if uri.starts_with("embedded://") {
+            if uri.contains("://") {
                 load_context.load(uri.to_string())
             } else if let Ok(_data_uri) = DataUri::parse(uri) {
                 load_context.get_label_handle(GltfAssetLabel::Texture(texture.index()).to_string())
