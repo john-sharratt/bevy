@@ -60,6 +60,16 @@ impl Children {
         self.0.swap(a_index, b_index);
     }
 
+    /// Rebuilds the children list using the provided iterator of entities.
+    #[inline]
+    pub fn rebuild_from<I>(&mut self, iter: I)
+    where
+        I: IntoIterator<Item = Entity>,
+    {
+        self.0.clear();
+        self.0.extend(iter);
+    }
+
     /// Sorts children [stably](https://en.wikipedia.org/wiki/Sorting_algorithm#Stability)
     /// in place using the provided comparator function.
     ///
