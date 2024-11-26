@@ -29,7 +29,7 @@ use std::ops::Deref;
 pub struct Children {
     pub(crate) all: SmallVec<[Entity; 8]>,
     pub(crate) active: Option<SmallVec<[Entity; 8]>>,
-};
+}
 
 impl MapEntities for Children {
     fn map_entities<M: EntityMapper>(&mut self, entity_mapper: &mut M) {
