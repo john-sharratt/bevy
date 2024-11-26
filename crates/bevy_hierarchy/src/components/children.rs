@@ -26,11 +26,14 @@ use std::ops::Deref;
 #[derive(Component, Debug)]
 #[cfg_attr(feature = "reflect", derive(bevy_reflect::Reflect))]
 #[cfg_attr(feature = "reflect", reflect(Component, MapEntities))]
-pub struct Children(pub(crate) SmallVec<[Entity; 8]>);
+pub struct Children {
+    pub(crate) all: SmallVec<[Entity; 8]>,
+    pub(crate) active: Option<SmallVec<[Entity; 8]>>,
+};
 
 impl MapEntities for Children {
     fn map_entities<M: EntityMapper>(&mut self, entity_mapper: &mut M) {
-        for entity in &mut self.0 {
+        for entity in &mut self.all {
             *entity = entity_mapper.map_entity(*entity);
         }
     }
@@ -43,7 +46,10 @@ impl MapEntities for Children {
 impl FromWorld for Children {
     #[inline]
     fn from_world(_world: &mut World) -> Self {
-        Children(SmallVec::new())
+        Children {
+            all: SmallVec::new(),
+            active: None,
+        }
     }
 }
 
@@ -51,23 +57,31 @@ impl Children {
     /// Constructs a [`Children`] component with the given entities.
     #[inline]
     pub(crate) fn from_entities(entities: &[Entity]) -> Self {
-        Self(SmallVec::from_slice(entities))
+        Self {
+            all: SmallVec::from_slice(entities),
+            active: None,
+        }
     }
 
     /// Swaps the child at `a_index` with the child at `b_index`.
     #[inline]
     pub fn swap(&mut self, a_index: usize, b_index: usize) {
-        self.0.swap(a_index, b_index);
+        self.all.swap(a_index, b_index);
+        self.active = None;
     }
 
     /// Rebuilds the children list using the provided iterator of entities.
     #[inline]
-    pub fn rebuild_from<I>(&mut self, iter: I)
+    pub fn set_active<I>(&mut self, iter: I)
     where
         I: IntoIterator<Item = Entity>,
     {
-        self.0.clear();
-        self.0.extend(iter);
+        if self.active.is_none() {
+            self.active = Some(SmallVec::new());
+        }
+        let active = self.active.as_mut().unwrap();
+        active.clear();
+        active.extend(iter);
     }
 
     /// Sorts children [stably](https://en.wikipedia.org/wiki/Sorting_algorithm#Stability)
@@ -79,11 +93,14 @@ impl Children {
     ///
     /// See also [`sort_by_key`](Children::sort_by_key), [`sort_by_cached_key`](Children::sort_by_cached_key).
     #[inline]
-    pub fn sort_by<F>(&mut self, compare: F)
+    pub fn sort_by<F>(&mut self, mut compare: F)
     where
         F: FnMut(&Entity, &Entity) -> std::cmp::Ordering,
     {
-        self.0.sort_by(compare);
+        self.all.sort_by(&mut compare);
+        if let Some(active) = self.active.as_mut() {
+            active.sort_by(&mut compare);
+        }
     }
 
     /// Sorts children [stably](https://en.wikipedia.org/wiki/Sorting_algorithm#Stability)
@@ -95,12 +112,15 @@ impl Children {
     ///
     /// See also [`sort_by`](Children::sort_by), [`sort_by_cached_key`](Children::sort_by_cached_key).
     #[inline]
-    pub fn sort_by_key<K, F>(&mut self, compare: F)
+    pub fn sort_by_key<K, F>(&mut self, mut compare: F)
     where
         F: FnMut(&Entity) -> K,
         K: Ord,
     {
-        self.0.sort_by_key(compare);
+        self.all.sort_by_key(&mut compare);
+        if let Some(active) = self.active.as_mut() {
+            active.sort_by_key(&mut compare);
+        }
     }
 
     /// Sorts children [stably](https://en.wikipedia.org/wiki/Sorting_algorithm#Stability)
@@ -111,12 +131,15 @@ impl Children {
     ///
     /// See also [`sort_by`](Children::sort_by), [`sort_by_key`](Children::sort_by_key).
     #[inline]
-    pub fn sort_by_cached_key<K, F>(&mut self, compare: F)
+    pub fn sort_by_cached_key<K, F>(&mut self, mut compare: F)
     where
         F: FnMut(&Entity) -> K,
         K: Ord,
     {
-        self.0.sort_by_cached_key(compare);
+        self.all.sort_by_cached_key(&mut compare);
+        if let Some(active) = self.active.as_mut() {
+            active.sort_by_cached_key(&mut compare);
+        }
     }
 
     /// Sorts children [unstably](https://en.wikipedia.org/wiki/Sorting_algorithm#Stability)
@@ -128,11 +151,14 @@ impl Children {
     ///
     /// See also [`sort_unstable_by_key`](Children::sort_unstable_by_key).
     #[inline]
-    pub fn sort_unstable_by<F>(&mut self, compare: F)
+    pub fn sort_unstable_by<F>(&mut self, mut compare: F)
     where
         F: FnMut(&Entity, &Entity) -> std::cmp::Ordering,
     {
-        self.0.sort_unstable_by(compare);
+        self.all.sort_unstable_by(&mut compare);
+        if let Some(active) = self.active.as_mut() {
+            active.sort_unstable_by(&mut compare);
+        }
     }
 
     /// Sorts children [unstably](https://en.wikipedia.org/wiki/Sorting_algorithm#Stability)
@@ -144,12 +170,22 @@ impl Children {
     ///
     /// See also [`sort_unstable_by`](Children::sort_unstable_by).
     #[inline]
-    pub fn sort_unstable_by_key<K, F>(&mut self, compare: F)
+    pub fn sort_unstable_by_key<K, F>(&mut self, mut compare: F)
     where
         F: FnMut(&Entity) -> K,
         K: Ord,
     {
-        self.0.sort_unstable_by_key(compare);
+        self.all.sort_unstable_by_key(&mut compare);
+        if let Some(active) = self.active.as_mut() {
+            active.sort_unstable_by_key(&mut compare);
+        }
+    }
+
+    /// Iterates only the active children thus reducing the overhead of iterating all children.
+    /// (especially on calculations such as the GlobalTransforms)
+    #[inline]
+    pub fn iter_active(&self) -> impl Iterator<Item = &Entity> {
+        self.active.as_ref().map(|active| active.iter()).unwrap_or_else(|| self.all.iter())
     }
 }
 
@@ -158,7 +194,7 @@ impl Deref for Children {
 
     #[inline(always)]
     fn deref(&self) -> &Self::Target {
-        &self.0[..]
+        &self.all[..]
     }
 }
 
@@ -169,6 +205,6 @@ impl<'a> IntoIterator for &'a Children {
 
     #[inline(always)]
     fn into_iter(self) -> Self::IntoIter {
-        self.0.iter()
+        self.all.iter()
     }
 }
