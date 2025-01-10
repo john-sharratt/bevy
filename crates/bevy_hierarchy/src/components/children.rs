@@ -104,6 +104,15 @@ impl Children {
         }
     }
 
+    /// Swaps the active entities with the provided list of entities.
+    pub fn swap_active(&mut self, other: &mut SmallVec<[Entity; 8]>) {
+        if self.active.is_none() {
+            self.active = Some(SmallVec::new());
+        }
+        let active = self.active.as_mut().unwrap();
+        std::mem::swap(active, other);
+    }
+
     /// Rebuilds the children list using the provided iterator of entities.
     #[inline]
     pub fn set_active<I>(&mut self, iter: I)
