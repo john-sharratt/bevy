@@ -92,11 +92,10 @@ impl Children {
     {
         if self.active.is_none() {
             self.active = Some(SmallVec::new());
-        } else {
-            let active = self.active.as_mut().unwrap();
-            active.clear();
-            active.extend(iter);
         }
+        let active = self.active.as_mut().unwrap();
+        active.clear();
+        active.extend(iter);
     }
 
     /// Sorts children [stably](https://en.wikipedia.org/wiki/Sorting_algorithm#Stability)
