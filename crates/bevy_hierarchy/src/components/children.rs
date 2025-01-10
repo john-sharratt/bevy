@@ -93,6 +93,11 @@ impl Children {
         active.clear();
     }
 
+    /// Returns true if there is nothing active
+    pub fn is_zero_active(&self) -> bool {
+        self.active.as_ref().map(|a| a.is_empty()).unwrap_or_default()
+    }
+
     /// Adds a child entity to the active children list.
     #[inline(always)]
     pub fn add_active(&mut self, entity: Entity) {
