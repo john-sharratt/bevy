@@ -84,6 +84,26 @@ impl Children {
         self.active = None;
     }
 
+    /// Clears all the active children
+    pub fn set_zero_active(&mut self) {
+        if self.active.is_none() {
+            self.active = Some(SmallVec::new());
+        }
+        let active = self.active.as_mut().unwrap();
+        active.clear();
+    }
+
+    /// Adds a child entity to the active children list.
+    #[inline(always)]
+    pub fn add_active(&mut self, entity: Entity) {
+        match &mut self.active {
+            Some(active) => active.push(entity),
+            None => {
+                self.active = Some(SmallVec::from_slice(&[entity]));
+            }
+        }
+    }
+
     /// Rebuilds the children list using the provided iterator of entities.
     #[inline]
     pub fn set_active<I>(&mut self, iter: I)
