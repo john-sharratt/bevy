@@ -25,7 +25,7 @@ use smallvec::SmallVec;
 /// [`Query`]: bevy_ecs::system::Query
 /// [`Parent`]: crate::components::parent::Parent
 /// [`BuildChildren::with_children`]: crate::child_builder::BuildChildren::with_children
-#[derive(Component, Debug)]
+#[derive(Component, Debug, VisitEntitiesMut)]
 #[cfg_attr(feature = "reflect", derive(bevy_reflect::Reflect))]
 #[cfg_attr(
     feature = "reflect",
@@ -38,20 +38,7 @@ use smallvec::SmallVec;
         FromWorld
     )
 )]
-pub struct Children {
-    pub(crate) all: SmallVec<[Entity; 8]>,
-    pub(crate) active: Option<SmallVec<[Entity; 8]>>,
-}
-
-impl VisitEntitiesMut for Children {
-    fn visit_entities_mut<F: FnMut(&mut Entity)>(&mut self, f: F) {
-        if let Some(active) = self.active.as_mut() {
-            active.as_mut().iter_mut().for_each(f);
-        } else {
-            self.all.iter_mut().for_each(f);
-        }
-    }
-}
+pub struct Children(pub(crate) SmallVec<[Entity; 8]>);
 
 // TODO: We need to impl either FromWorld or Default so Children can be registered as Reflect.
 // This is because Reflect deserialize by creating an instance and apply a patch on top.
@@ -60,10 +47,7 @@ impl VisitEntitiesMut for Children {
 impl FromWorld for Children {
     #[inline]
     fn from_world(_world: &mut World) -> Self {
-        Children {
-            all: SmallVec::new(),
-            active: None,
-        }
+        Children(SmallVec::new())
     }
 }
 
@@ -71,65 +55,13 @@ impl Children {
     /// Constructs a [`Children`] component with the given entities.
     #[inline]
     pub(crate) fn from_entities(entities: &[Entity]) -> Self {
-        Self {
-            all: SmallVec::from_slice(entities),
-            active: None,
-        }
+        Self(SmallVec::from_slice(entities))
     }
 
     /// Swaps the child at `a_index` with the child at `b_index`.
     #[inline]
     pub fn swap(&mut self, a_index: usize, b_index: usize) {
-        self.all.swap(a_index, b_index);
-        self.active = None;
-    }
-
-    /// Clears all the active children
-    pub fn set_zero_active(&mut self) {
-        if self.active.is_none() {
-            self.active = Some(SmallVec::new());
-        }
-        let active = self.active.as_mut().unwrap();
-        active.clear();
-    }
-
-    /// Returns true if there is nothing active
-    pub fn is_zero_active(&self) -> bool {
-        self.active.as_ref().map(|a| a.is_empty()).unwrap_or_default()
-    }
-
-    /// Adds a child entity to the active children list.
-    #[inline(always)]
-    pub fn add_active(&mut self, entity: Entity) {
-        match &mut self.active {
-            Some(active) => active.push(entity),
-            None => {
-                self.active = Some(SmallVec::from_slice(&[entity]));
-            }
-        }
-    }
-
-    /// Swaps the active entities with the provided list of entities.
-    pub fn swap_active(&mut self, other: &mut SmallVec<[Entity; 8]>) {
-        if self.active.is_none() {
-            self.active = Some(SmallVec::new());
-        }
-        let active = self.active.as_mut().unwrap();
-        std::mem::swap(active, other);
-    }
-
-    /// Rebuilds the children list using the provided iterator of entities.
-    #[inline]
-    pub fn set_active<I>(&mut self, iter: I)
-    where
-        I: IntoIterator<Item = Entity>,
-    {
-        if self.active.is_none() {
-            self.active = Some(SmallVec::new());
-        }
-        let active = self.active.as_mut().unwrap();
-        active.clear();
-        active.extend(iter);
+        self.0.swap(a_index, b_index);
     }
 
     /// Sorts children [stably](https://en.wikipedia.org/wiki/Sorting_algorithm#Stability)
@@ -141,14 +73,11 @@ impl Children {
     ///
     /// See also [`sort_by_key`](Children::sort_by_key), [`sort_by_cached_key`](Children::sort_by_cached_key).
     #[inline]
-    pub fn sort_by<F>(&mut self, mut compare: F)
+    pub fn sort_by<F>(&mut self, compare: F)
     where
         F: FnMut(&Entity, &Entity) -> core::cmp::Ordering,
     {
-        self.all.sort_by(&mut compare);
-        if let Some(active) = self.active.as_mut() {
-            active.sort_by(&mut compare);
-        }
+        self.0.sort_by(compare);
     }
 
     /// Sorts children [stably](https://en.wikipedia.org/wiki/Sorting_algorithm#Stability)
@@ -160,15 +89,12 @@ impl Children {
     ///
     /// See also [`sort_by`](Children::sort_by), [`sort_by_cached_key`](Children::sort_by_cached_key).
     #[inline]
-    pub fn sort_by_key<K, F>(&mut self, mut compare: F)
+    pub fn sort_by_key<K, F>(&mut self, compare: F)
     where
         F: FnMut(&Entity) -> K,
         K: Ord,
     {
-        self.all.sort_by_key(&mut compare);
-        if let Some(active) = self.active.as_mut() {
-            active.sort_by_key(&mut compare);
-        }
+        self.0.sort_by_key(compare);
     }
 
     /// Sorts children [stably](https://en.wikipedia.org/wiki/Sorting_algorithm#Stability)
@@ -179,15 +105,12 @@ impl Children {
     ///
     /// See also [`sort_by`](Children::sort_by), [`sort_by_key`](Children::sort_by_key).
     #[inline]
-    pub fn sort_by_cached_key<K, F>(&mut self, mut compare: F)
+    pub fn sort_by_cached_key<K, F>(&mut self, compare: F)
     where
         F: FnMut(&Entity) -> K,
         K: Ord,
     {
-        self.all.sort_by_cached_key(&mut compare);
-        if let Some(active) = self.active.as_mut() {
-            active.sort_by_cached_key(&mut compare);
-        }
+        self.0.sort_by_cached_key(compare);
     }
 
     /// Sorts children [unstably](https://en.wikipedia.org/wiki/Sorting_algorithm#Stability)
@@ -199,14 +122,11 @@ impl Children {
     ///
     /// See also [`sort_unstable_by_key`](Children::sort_unstable_by_key).
     #[inline]
-    pub fn sort_unstable_by<F>(&mut self, mut compare: F)
+    pub fn sort_unstable_by<F>(&mut self, compare: F)
     where
         F: FnMut(&Entity, &Entity) -> core::cmp::Ordering,
     {
-        self.all.sort_unstable_by(&mut compare);
-        if let Some(active) = self.active.as_mut() {
-            active.sort_unstable_by(&mut compare);
-        }
+        self.0.sort_unstable_by(compare);
     }
 
     /// Sorts children [unstably](https://en.wikipedia.org/wiki/Sorting_algorithm#Stability)
@@ -218,15 +138,12 @@ impl Children {
     ///
     /// See also [`sort_unstable_by`](Children::sort_unstable_by).
     #[inline]
-    pub fn sort_unstable_by_key<K, F>(&mut self, mut compare: F)
+    pub fn sort_unstable_by_key<K, F>(&mut self, compare: F)
     where
         F: FnMut(&Entity) -> K,
         K: Ord,
     {
-        self.all.sort_unstable_by_key(&mut compare);
-        if let Some(active) = self.active.as_mut() {
-            active.sort_unstable_by_key(&mut compare);
-        }
+        self.0.sort_unstable_by_key(compare);
     }
 }
 
@@ -235,11 +152,7 @@ impl Deref for Children {
 
     #[inline(always)]
     fn deref(&self) -> &Self::Target {
-        if let Some(active) = self.active.as_ref() {
-            &active[..]
-        } else {
-            &self.all[..]
-        }
+        &self.0[..]
     }
 }
 
@@ -250,10 +163,6 @@ impl<'a> IntoIterator for &'a Children {
 
     #[inline(always)]
     fn into_iter(self) -> Self::IntoIter {
-        if let Some(active) = self.active.as_ref() {
-            active.iter()
-        } else {
-            self.all.iter()
-        }
+        self.0.iter()
     }
 }
