@@ -694,7 +694,7 @@ pub fn prepare_volumetric_fog_uniforms(
     mut local_from_world_matrices: Local<Vec<Mat4>>,
 ) {
     let Some(mut writer) = volumetric_lighting_uniform_buffer.get_writer(
-        view_targets.iter().len(),
+        view_targets.iter().len() * fog_volumes.iter().len(),
         &render_device,
         &render_queue,
     ) else {
