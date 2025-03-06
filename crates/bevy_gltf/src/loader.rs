@@ -41,8 +41,8 @@ use bevy_render::{
     view::Visibility,
 };
 use bevy_scene::Scene;
-#[cfg(not(target_arch = "wasm32"))]
-use bevy_tasks::IoTaskPool;
+//#[cfg(not(target_arch = "wasm32"))]
+//use bevy_tasks::IoTaskPool;
 use bevy_transform::components::Transform;
 use bevy_utils::{
     tracing::{error, info_span, warn},
@@ -59,16 +59,12 @@ use gltf::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{value, Value};
-use std::borrow::Cow;
 use std::{
     io::Error,
     path::{Path, PathBuf},
 };
 #[cfg(feature = "bevy_animation")]
-use {
-    bevy_animation::prelude::*,
-    smallvec::SmallVec,
-};
+use {bevy_animation::prelude::*, smallvec::SmallVec};
 
 /// An error that occurs when loading a glTF file.
 #[derive(Error, Display, Debug, From)]
@@ -195,8 +191,9 @@ impl AssetLoader for GltfLoader {
         settings: &GltfLoaderSettings,
         load_context: &mut LoadContext<'_>,
     ) -> Result<Gltf, Self::Error> {
-        let bytes = reader.read_to_cow().await?;
-        load_gltf(self, bytes, load_context, settings).await
+        let mut bytes = Vec::new();
+        reader.read_to_end(&mut bytes).await?;
+        load_gltf(self, &bytes, load_context, settings).await
     }
 
     fn extensions(&self) -> &[&str] {
@@ -204,19 +201,14 @@ impl AssetLoader for GltfLoader {
     }
 }
 
-static LOAD_GLTF_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
 /// Loads an entire glTF file.
 async fn load_gltf<'a, 'b, 'c>(
     loader: &GltfLoader,
-    bytes: Cow<'static, [u8]>,
+    bytes: &'a [u8],
     load_context: &'b mut LoadContext<'c>,
     settings: &'b GltfLoaderSettings,
 ) -> Result<Gltf, GltfError> {
-    let gltf = {
-        let _guard = LOAD_GLTF_LOCK.lock().unwrap();
-        gltf::Gltf::from_slice(&bytes)?
-    };
+    let gltf = gltf::Gltf::from_slice(bytes)?;
     let file_name = load_context
         .asset_path()
         .path()
@@ -578,6 +570,26 @@ async fn load_gltf<'a, 'b, 'c>(
     // later in the loader when looking up handles for materials. However this would mean
     // that the material's load context would no longer track those images as dependencies.
     let mut _texture_handles = Vec::new();
+
+    // TODO: Remove this and fix the code below it that was commented out
+    // https://github.com/bevyengine/bevy/issues/15271
+    for texture in gltf.textures() {
+        let parent_path = load_context.path().parent().unwrap();
+        let image = load_image(
+            texture,
+            &buffer_data,
+            &linear_textures,
+            parent_path,
+            loader.supported_compressed_formats,
+            settings.load_materials,
+        )
+        .await?;
+        process_loaded_texture(load_context, &mut _texture_handles, image);
+    }
+
+    /*
+     * See https://github.com/bevyengine/bevy/issues/15271 for more details
+     *
     if gltf.textures().len() == 1 || cfg!(target_arch = "wasm32") {
         for texture in gltf.textures() {
             let parent_path = load_context.path().parent().unwrap();
@@ -623,6 +635,7 @@ async fn load_gltf<'a, 'b, 'c>(
                 }
             });
     }
+    */
 
     let mut materials = vec![];
     let mut named_materials = HashMap::default();
@@ -1662,7 +1675,10 @@ fn load_node(
                                 value: extras.get().to_string(),
                             });
                         }
-                        lights.entry(gltf_node.index()).or_default().push(entity.id());
+                        lights
+                            .entry(gltf_node.index())
+                            .or_default()
+                            .push(entity.id());
                     }
                 }
             }
