@@ -49,7 +49,7 @@ pub trait ErasedAssetLoader: Send + Sync + 'static {
     /// Asynchronously loads the asset(s) from the bytes provided by [`Reader`].
     fn load<'a>(
         &'a self,
-        reader: &'a mut dyn Reader,
+        reader: &'a mut dyn Reader,        
         meta: Box<dyn AssetMetaDyn>,
         load_context: LoadContext<'a>,
     ) -> BoxedFuture<

@@ -170,6 +170,7 @@ impl AssetLoader for MeshletMeshLoader {
     async fn load(
         &self,
         reader: &mut dyn Reader,
+        _bytes: Option<&[u8]>,
         _settings: &(),
         _load_context: &mut LoadContext<'_>,
     ) -> Result<MeshletMesh, MeshletMeshSaveOrLoadError> {

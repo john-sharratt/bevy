@@ -683,8 +683,7 @@ mod tests {
             _settings: &Self::Settings,
             load_context: &mut LoadContext<'_>,
         ) -> Result<Self::Asset, Self::Error> {
-            let mut bytes = Vec::new();
-            reader.read_to_end(&mut bytes).await?;
+            let bytes = reader.read_to_cow().await?;
             let mut ron: CoolTextRon = ron::de::from_bytes(&bytes)?;
             let mut embedded = String::new();
             for dep in ron.embedded_dependencies {

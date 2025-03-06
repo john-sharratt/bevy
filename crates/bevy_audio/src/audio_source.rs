@@ -1,7 +1,7 @@
 use bevy_asset::{io::Reader, Asset, AssetLoader, LoadContext};
 use bevy_reflect::TypePath;
 use bevy_utils::CowArc;
-use std::io::Cursor;
+use std::{borrow::Cow, io::Cursor};
 
 /// A source of audio data
 #[derive(Asset, Debug, Clone, TypePath)]
@@ -57,10 +57,12 @@ impl AssetLoader for AudioLoader {
         _settings: &Self::Settings,
         _load_context: &mut LoadContext<'_>,
     ) -> Result<AudioSource, Self::Error> {
-        let mut bytes = Vec::new();
-        reader.read_to_end(&mut bytes).await?;
+        let bytes = reader.read_to_cow().await?;
         Ok(AudioSource {
-            bytes: CowArc::Owned(bytes.into()),
+            bytes: match bytes {
+                Cow::Owned(bytes) => CowArc::Owned(bytes.to_owned().into()),
+                Cow::Borrowed(bytes) => CowArc::Static(bytes),
+            },
         })
     }
 

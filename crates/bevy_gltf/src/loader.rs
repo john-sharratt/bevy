@@ -194,8 +194,7 @@ impl AssetLoader for GltfLoader {
         settings: &GltfLoaderSettings,
         load_context: &mut LoadContext<'_>,
     ) -> Result<Gltf, Self::Error> {
-        let mut bytes = Vec::new();
-        reader.read_to_end(&mut bytes).await?;
+        let bytes = reader.read_to_cow().await?;
         load_gltf(self, &bytes, load_context, settings).await
     }
 
