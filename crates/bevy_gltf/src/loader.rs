@@ -59,6 +59,7 @@ use gltf::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{value, Value};
+use std::borrow::Cow;
 use std::{
     io::Error,
     path::{Path, PathBuf},
@@ -195,7 +196,7 @@ impl AssetLoader for GltfLoader {
         load_context: &mut LoadContext<'_>,
     ) -> Result<Gltf, Self::Error> {
         let bytes = reader.read_to_cow().await?;
-        load_gltf(self, &bytes, load_context, settings).await
+        load_gltf(self, bytes, load_context, settings).await
     }
 
     fn extensions(&self) -> &[&str] {
@@ -203,14 +204,19 @@ impl AssetLoader for GltfLoader {
     }
 }
 
+static LOAD_GLTF_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 /// Loads an entire glTF file.
 async fn load_gltf<'a, 'b, 'c>(
     loader: &GltfLoader,
-    bytes: &'a [u8],
+    bytes: Cow<'static, [u8]>,
     load_context: &'b mut LoadContext<'c>,
     settings: &'b GltfLoaderSettings,
 ) -> Result<Gltf, GltfError> {
-    let gltf = gltf::Gltf::from_slice(bytes)?;
+    let gltf = {
+        let _guard = LOAD_GLTF_LOCK.lock().unwrap();
+        gltf::Gltf::from_slice(&bytes)?
+    };
     let file_name = load_context
         .asset_path()
         .path()
