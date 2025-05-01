@@ -41,7 +41,6 @@ impl AssetLoader for CustomAssetLoader {
     async fn load(
         &self,
         reader: &mut dyn Reader,
-        bytes: Option<&[u8]>,
         _settings: &(),
         _load_context: &mut LoadContext<'_>,
     ) -> Result<Self::Asset, Self::Error> {
@@ -80,7 +79,6 @@ impl AssetLoader for BlobAssetLoader {
     async fn load(
         &self,
         reader: &mut dyn Reader,
-        _bytes: Option<&[u8]>,
         _settings: &(),
         _load_context: &mut LoadContext<'_>,
     ) -> Result<Self::Asset, Self::Error> {

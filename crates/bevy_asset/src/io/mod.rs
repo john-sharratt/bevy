@@ -30,7 +30,6 @@ use core::{
     task::{Context, Poll},
 };
 use std::borrow::Cow;
-use derive_more::derive::{Display, Error, From};
 use futures_io::{AsyncRead, AsyncWrite};
 use futures_lite::{ready, Stream};
 use std::path::{Path, PathBuf};

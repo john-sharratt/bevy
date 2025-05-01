@@ -528,7 +528,7 @@ async fn load_gltf<'a, 'b, 'c>(
             settings.load_materials,
         )
         .await?;
-        process_loaded_texture(load_context, &mut _texture_handles, image);
+        image.process_loaded_texture(load_context, &mut _texture_handles);
     }
 
     /*
@@ -1731,7 +1731,6 @@ impl ImageOrPath {
                     settings.sampler = ImageSampler::Descriptor(sampler_descriptor.clone());
                 })
                 .load(path),
-            }
             ImageOrPath::Path {
                 path,
                 is_srgb,

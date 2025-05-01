@@ -43,7 +43,6 @@ impl AssetLoader for GzAssetLoader {
     async fn load(
         &self,
         reader: &mut dyn Reader,
-        _bytes: Option<&[u8]>,
         _settings: &(),
         load_context: &mut LoadContext<'_>,
     ) -> Result<Self::Asset, Self::Error> {
@@ -57,7 +56,7 @@ impl AssetLoader for GzAssetLoader {
             .ok_or(GzAssetLoaderError::IndeterminateFilePath)?;
         let contained_path = compressed_path.join(uncompressed_file_name);
 
-        let mut bytes_compressed = reader.read_to_cow().await?;
+        let bytes_compressed = reader.read_to_cow().await?;
 
         let mut decoder = GzDecoder::new(bytes_compressed.as_ref());
 

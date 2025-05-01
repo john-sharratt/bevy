@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use bevy_app::{App, Plugin};
 use bevy_asset::{Assets, Handle};
 use bevy_image::{Image, TextureAtlas, TextureAtlasLayout, TextureAtlasPlugin};
@@ -140,7 +142,7 @@ pub(crate) fn calculate_effective_rect(
 /// Extracts the RGBA pixel data from `image`, converting it if necessary.
 ///
 /// Only supports rgba8 and rgba32float formats.
-pub(crate) fn extract_rgba_pixels(image: &Image) -> Option<Vec<u8>> {
+pub(crate) fn extract_rgba_pixels(image: &Image) -> Option<Cow<'static, [u8]>> {
     match image.texture_descriptor.format {
         TextureFormat::Rgba8Unorm
         | TextureFormat::Rgba8UnormSrgb
@@ -171,7 +173,7 @@ pub(crate) fn extract_and_transform_rgba_pixels(
     flip_x: bool,
     flip_y: bool,
     rect: Rect,
-) -> Option<Vec<u8>> {
+) -> Option<Cow<'static, [u8]>> {
     let image_data = extract_rgba_pixels(image)?;
 
     let width = rect.width() as usize;
@@ -190,7 +192,7 @@ pub(crate) fn extract_and_transform_rgba_pixels(
         }
     }
 
-    Some(sub_image_data)
+    Some(sub_image_data.into())
 }
 
 /// Transforms the `hotspot` coordinates based on whether the image is flipped
@@ -396,7 +398,7 @@ mod tests {
                     let image = create_image_rgba8(image_data);
                     let rect = $rect;
                     let result = extract_and_transform_rgba_pixels(&image, $flip_x, $flip_y, rect);
-                    assert_eq!(result, Some($expected.to_vec()));
+                    assert_eq!(result, Some($expected.to_vec().into()));
                 }
 
                 // RGBA32Float test
@@ -404,7 +406,7 @@ mod tests {
                     let image = create_image_rgba32float(image_data);
                     let rect = $rect;
                     let result = extract_and_transform_rgba_pixels(&image, $flip_x, $flip_y, rect);
-                    assert_eq!(result, Some($expected.to_vec()));
+                    assert_eq!(result, Some($expected.to_vec().into()));
                 }
             }
         };

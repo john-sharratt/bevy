@@ -56,7 +56,7 @@ pub trait ErasedAssetLoader: Send + Sync + 'static {
     fn load<'a>(
         &'a self,
         reader: &'a mut dyn Reader,        
-        meta: Box<dyn AssetMetaDyn>,
+        meta: &'a dyn AssetMetaDyn,
         load_context: LoadContext<'a>,
     ) -> BoxedFuture<
         'a,

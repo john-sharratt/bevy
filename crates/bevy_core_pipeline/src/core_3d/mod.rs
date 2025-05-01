@@ -780,21 +780,21 @@ pub fn prepare_core_3d_depth_textures(
         &Msaa,
     )>,
 ) {
-    let mut render_target_usage = HashMap::default();
-    let mut camera_texture_usage = HashMap::default();
-    for (view, camera, depth_prepass, camera_3d, _msaa) in &views_3d {
+    let mut render_target_usage = <HashMap<_, _>>::default();
+    let mut camera_texture_usage: HashMap<RetainedViewEntity, TextureUsages> = HashMap::default();
+    for (_, camera, extracted_view, depth_prepass, camera_3d, _msaa) in &views_3d {
         // Default usage required to write to the depth texture
         let mut usage: TextureUsages = camera_3d.depth_texture_usages.into();
         if depth_prepass.is_some() {
             // Required to read the output of the prepass
             usage |= TextureUsages::COPY_SRC;
         }
-        camera_texture_usage.insert(view, usage);
+        camera_texture_usage.insert(extracted_view.retained_view_entity, usage);
 
-        if !opaque_3d_phases.contains_key(&view)
-            || !alpha_mask_3d_phases.contains_key(&view)
-            || !transmissive_3d_phases.contains_key(&view)
-            || !transparent_3d_phases.contains_key(&view)
+        if !opaque_3d_phases.contains_key(&extracted_view.retained_view_entity)
+            || !alpha_mask_3d_phases.contains_key(&extracted_view.retained_view_entity)
+            || !transmissive_3d_phases.contains_key(&extracted_view.retained_view_entity)
+            || !transparent_3d_phases.contains_key(&extracted_view.retained_view_entity)
         {
             continue;
         };
@@ -824,7 +824,9 @@ pub fn prepare_core_3d_depth_textures(
                     .get(&camera.target.clone())
                     .cloned()
                     .unwrap_or(
-                        *camera_texture_usage.get(&entity).expect("The depth texture usage should already exist for this target"));
+                        *render_target_usage
+                            .get(&camera.target.clone())
+                            .expect("The depth texture usage should already exist for this target"));
 
                 let descriptor = TextureDescriptor {
                     label: Some("view_depth_texture"),
