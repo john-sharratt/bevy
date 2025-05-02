@@ -61,7 +61,7 @@ use bevy_ecs::prelude::*;
 use bevy_platform::collections::{HashMap, HashSet};
 use bevy_tasks::IoTaskPool;
 use futures_io::ErrorKind;
-use futures_lite::{AsyncReadExt, AsyncWriteExt, StreamExt};
+use futures_lite::{AsyncWriteExt, StreamExt};
 use parking_lot::RwLock;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
@@ -868,9 +868,8 @@ impl AssetProcessor {
 
         let processed_writer = source.processed_writer()?;
 
-        let mut asset_bytes = Vec::new();
-        byte_reader
-            .read_to_end(&mut asset_bytes)
+        let asset_bytes = byte_reader
+            .read_to_cow()
             .await
             .map_err(|e| ProcessError::AssetReaderError {
                 path: asset_path.clone(),

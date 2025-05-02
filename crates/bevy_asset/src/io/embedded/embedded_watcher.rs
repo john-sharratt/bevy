@@ -75,10 +75,9 @@ impl FilesystemEventHandler for EmbeddedEventHandler {
             if let AssetSourceEvent::ModifiedAsset(path) = &event {
                 if let Ok(file) = File::open(&absolute_paths[0]) {
                     let mut reader = BufReader::new(file);
-                    let mut buffer = Vec::new();
-
+                    
                     // Read file into vector.
-                    if reader.read_to_end(&mut buffer).is_ok() {
+                    if let Ok(buffer) = reader.read_to_cow() {
                         self.dir.insert_asset(path, buffer);
                     }
                 }

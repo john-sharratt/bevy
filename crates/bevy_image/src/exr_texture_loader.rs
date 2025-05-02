@@ -50,8 +50,7 @@ impl AssetLoader for ExrTextureLoader {
         let bytes = match bytes {
             Some(bytes) => bytes,
             None => {
-                bytes_store = Vec::new();
-                reader.read_to_end(&mut bytes_store).await?;
+                bytes_store = reader.read_to_cow().await?;
                 bytes_store.as_slice()
             }
         };

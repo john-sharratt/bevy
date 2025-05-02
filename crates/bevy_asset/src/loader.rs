@@ -9,7 +9,6 @@ use crate::{
 use alloc::{
     boxed::Box,
     string::{String, ToString},
-    vec::Vec,
 };
 use atomicow::CowArc;
 use bevy_ecs::world::World;
@@ -19,7 +18,7 @@ use core::any::{Any, TypeId};
 use downcast_rs::{impl_downcast, Downcast};
 use ron::error::SpannedError;
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
+use std::{borrow::Cow, path::{Path, PathBuf}};
 use thiserror::Error;
 
 /// Loads an [`Asset`] from a given byte [`Reader`]. This can accept [`AssetLoader::Settings`], which configure how the [`Asset`]
@@ -496,7 +495,7 @@ impl<'a> LoadContext<'a> {
     pub async fn read_asset_bytes<'b, 'c>(
         &'b mut self,
         path: impl Into<AssetPath<'c>>,
-    ) -> Result<Vec<u8>, ReadAssetBytesError> {
+    ) -> Result<Cow<'static, [u8]>, ReadAssetBytesError> {
         let path = path.into();
         let source = self.asset_server.get_source(path.source())?;
         let asset_reader = match self.asset_server.mode() {
@@ -517,9 +516,8 @@ impl<'a> LoadContext<'a> {
         } else {
             Default::default()
         };
-        let mut bytes = Vec::new();
-        reader
-            .read_to_end(&mut bytes)
+        let bytes = reader
+            .read_to_cow()
             .await
             .map_err(|source| ReadAssetBytesError::Io {
                 path: path.path().to_path_buf(),

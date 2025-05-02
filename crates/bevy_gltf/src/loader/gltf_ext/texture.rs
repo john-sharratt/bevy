@@ -27,7 +27,9 @@ pub(crate) fn texture_handle(
                 .decode_utf8()
                 .unwrap();
             let uri = uri.as_ref();
-            if let Ok(_data_uri) = DataUri::parse(uri) {
+            if uri.contains("://") {
+                load_context.load(uri.to_string())
+            } else if let Ok(_data_uri) = DataUri::parse(uri) {
                 load_context.get_label_handle(texture_label(texture).to_string())
             } else {
                 let parent = load_context.path().parent().unwrap();

@@ -2,8 +2,7 @@ mod extensions;
 mod gltf_ext;
 
 use std::{
-    io::Error,
-    path::{Path, PathBuf},
+    borrow::Cow, io::Error, path::{Path, PathBuf}
 };
 
 #[cfg(feature = "bevy_animation")]
@@ -206,9 +205,7 @@ impl AssetLoader for GltfLoader {
         settings: &GltfLoaderSettings,
         load_context: &mut LoadContext<'_>,
     ) -> Result<Gltf, Self::Error> {
-        let mut bytes = Vec::new();
-        reader.read_to_end(&mut bytes).await?;
-
+        let bytes = reader.read_to_cow().await?;
         load_gltf(self, &bytes, load_context, settings).await
     }
 
@@ -644,7 +641,7 @@ async fn load_gltf<'a, 'b, 'c>(
             }
 
             // Read vertex indices
-            let reader = primitive.reader(|buffer| Some(buffer_data[buffer.index()].as_slice()));
+            let reader = primitive.reader(|buffer| Some(buffer_data[buffer.index()].as_ref()));
             if let Some(indices) = reader.read_indices() {
                 mesh.insert_indices(match indices {
                     ReadIndices::U8(is) => Indices::U16(is.map(|x| x as u16).collect()),
@@ -979,7 +976,7 @@ async fn load_gltf<'a, 'b, 'c>(
 /// Loads a glTF texture as a bevy [`Image`] and returns it together with its label.
 async fn load_image<'a, 'b>(
     gltf_texture: gltf::Texture<'a>,
-    buffer_data: &[Vec<u8>],
+    buffer_data: &[Cow<'static, [u8]>],
     linear_textures: &HashSet<usize>,
     parent_path: &'b Path,
     supported_compressed_formats: CompressedImageFormats,
@@ -1614,7 +1611,7 @@ fn load_node(
 async fn load_buffers(
     gltf: &gltf::Gltf,
     load_context: &mut LoadContext<'_>,
-) -> Result<Vec<Vec<u8>>, GltfError> {
+) -> Result<Vec<Cow<'static, [u8]>>, GltfError> {
     const VALID_MIME_TYPES: &[&str] = &["application/octet-stream", "application/gltf-buffer"];
 
     let mut buffer_data = Vec::new();
@@ -1627,7 +1624,7 @@ async fn load_buffers(
                 let uri = uri.as_ref();
                 let buffer_bytes = match DataUri::parse(uri) {
                     Ok(data_uri) if VALID_MIME_TYPES.contains(&data_uri.mime_type) => {
-                        data_uri.decode()?
+                        Cow::Owned(data_uri.decode()?)
                     }
                     Ok(_) => return Err(GltfError::BufferFormatUnsupported),
                     Err(()) => {
@@ -1640,7 +1637,7 @@ async fn load_buffers(
             }
             gltf::buffer::Source::Bin => {
                 if let Some(blob) = gltf.blob.as_deref() {
-                    buffer_data.push(blob.into());
+                    buffer_data.push(Cow::Owned(blob.into()));
                 } else {
                     return Err(GltfError::MissingBlob);
                 }
