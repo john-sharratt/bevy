@@ -34,6 +34,9 @@ cfg::std! {
 cfg::alloc! {
     extern crate alloc;
 
+    mod cow_arc;
+    pub use cow_arc::*;
+
     mod map;
     pub use map::*;
 }
@@ -57,7 +60,6 @@ pub mod prelude {
     pub use disqualified::ShortName;
 }
 
-mod cow_arc;
 mod atomic_id;
 mod bloom_filter;
 pub use bloom_filter::*;
@@ -70,7 +72,6 @@ mod once;
 pub use once::OnceFlag;
 
 pub use debug_info::DebugName;
-pub use cow_arc::*;
 pub use default::default;
 
 use core::mem::ManuallyDrop;

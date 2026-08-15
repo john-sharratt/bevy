@@ -1,6 +1,19 @@
-use std::{
-    borrow::Borrow, boxed::Box, fmt::{Debug, Display}, hash::Hash, ops::Deref, path::{Path, PathBuf}, string::String, sync::Arc
+use crate::cfg;
+use core::{
+    borrow::Borrow,
+    cmp::Ordering,
+    fmt::{Debug, Display, Formatter, Result as FmtResult},
+    hash::{Hash, Hasher},
+    ops::Deref,
 };
+
+cfg::alloc! {
+    use alloc::{boxed::Box, string::String, sync::Arc};
+}
+
+cfg::std! {
+    use std::path::{Path, PathBuf};
+}
 
 /// Much like a [`Cow`](std::borrow::Cow), but owned values are Arc-ed to make clones cheap. This should be used for values that
 /// are cloned for use across threads and change rarely (if ever).
@@ -93,28 +106,28 @@ impl<'a, T: PartialEq + ?Sized> Eq for CowArc<'a, T> {}
 
 impl<'a, T: Hash + ?Sized> Hash for CowArc<'a, T> {
     #[inline]
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+    fn hash<H: Hasher>(&self, state: &mut H) {
         self.deref().hash(state);
     }
 }
 
 impl<'a, T: Debug + ?Sized> Debug for CowArc<'a, T> {
     #[inline]
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         Debug::fmt(self.deref(), f)
     }
 }
 
 impl<'a, T: Display + ?Sized> Display for CowArc<'a, T> {
     #[inline]
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         Display::fmt(self.deref(), f)
     }
 }
 
 impl<'a, T: PartialOrd + ?Sized> PartialOrd for CowArc<'a, T> {
     #[inline]
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.deref().partial_cmp(other.deref())
     }
 }
@@ -125,30 +138,36 @@ impl Default for CowArc<'static, str> {
     }
 }
 
-impl Default for CowArc<'static, Path> {
-    fn default() -> Self {
-        CowArc::Static(Path::new(""))
+cfg::std! {
+    impl Default for CowArc<'static, Path> {
+        fn default() -> Self {
+            CowArc::Static(Path::new(""))
+        }
     }
 }
 
 impl<'a, T: Ord + ?Sized> Ord for CowArc<'a, T> {
     #[inline]
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    fn cmp(&self, other: &Self) -> Ordering {
         self.deref().cmp(other.deref())
     }
 }
 
-impl From<PathBuf> for CowArc<'static, Path> {
-    #[inline]
-    fn from(value: PathBuf) -> Self {
-        CowArc::Owned(value.into())
+cfg::std! {
+    impl From<PathBuf> for CowArc<'static, Path> {
+        #[inline]
+        fn from(value: PathBuf) -> Self {
+            CowArc::Owned(value.into())
+        }
     }
 }
 
-impl From<&'static str> for CowArc<'static, Path> {
-    #[inline]
-    fn from(value: &'static str) -> Self {
-        CowArc::Static(Path::new(value))
+cfg::std! {
+    impl From<&'static str> for CowArc<'static, Path> {
+        #[inline]
+        fn from(value: &'static str) -> Self {
+            CowArc::Static(Path::new(value))
+        }
     }
 }
 
