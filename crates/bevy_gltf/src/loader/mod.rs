@@ -254,7 +254,7 @@ impl GltfLoader {
         load_context: &'b mut LoadContext<'c>,
         settings: &'b GltfLoaderSettings,
     ) -> Result<Gltf, GltfError> {
-        let gltf = if settings.validate {
+        let mut gltf = if settings.validate {
             gltf::Gltf::from_slice(bytes)?
         } else {
             gltf::Gltf::from_slice_without_validation(bytes)?
@@ -279,7 +279,7 @@ impl GltfLoader {
                 "Gltf file name invalid",
             ))))?
             .to_string();
-        let buffer_data = load_buffers(&gltf, load_context).await?;
+        let buffer_data = load_buffers(&mut gltf, load_context, settings.include_source).await?;
 
         let linear_textures = get_linear_textures(&gltf.document);
 
@@ -1908,10 +1908,21 @@ fn load_node(
 
 /// Loads the raw glTF buffer data for a specific glTF file.
 async fn load_buffers(
-    gltf: &gltf::Gltf,
+    gltf: &mut gltf::Gltf,
     load_context: &mut LoadContext<'_>,
+    retain_source: bool,
 ) -> Result<Vec<Cow<'static, [u8]>>, GltfError> {
     const VALID_MIME_TYPES: &[&str] = &["application/octet-stream", "application/gltf-buffer"];
+
+    // Extracted before the loop: `gltf.buffers()` borrows `gltf` for the whole loop, so the
+    // blob cannot be taken from inside it. For a .glb this chunk holds the entire mesh and
+    // texture payload, so it is moved rather than copied — unless the caller is retaining the
+    // source document, which must still expose its own blob.
+    let mut blob = if retain_source {
+        gltf.blob.as_deref().map(<[u8]>::to_vec)
+    } else {
+        gltf.blob.take()
+    };
 
     let mut buffer_data = Vec::new();
     for buffer in gltf.buffers() {
@@ -1938,8 +1949,9 @@ async fn load_buffers(
                 buffer_data.push(buffer_bytes);
             }
             gltf::buffer::Source::Bin => {
-                if let Some(blob) = gltf.blob.as_deref() {
-                    buffer_data.push(Cow::Owned(blob.into()));
+                // glTF permits at most one BIN buffer, so consuming it here is safe.
+                if let Some(blob) = blob.take() {
+                    buffer_data.push(Cow::Owned(blob));
                 } else {
                     return Err(GltfError::MissingBlob);
                 }

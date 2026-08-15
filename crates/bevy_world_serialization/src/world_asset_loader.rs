@@ -58,8 +58,7 @@ impl AssetLoader for WorldAssetLoader {
         _settings: &(),
         load_context: &mut LoadContext<'_>,
     ) -> Result<Self::Asset, Self::Error> {
-        let mut bytes = Vec::new();
-        reader.read_to_end(&mut bytes).await?;
+        let bytes = reader.read_to_cow().await?;
         let mut deserializer = ron::de::Deserializer::from_bytes(&bytes)?;
         let scene_deserializer = WorldDeserializer {
             type_registry: &self.type_registry.read(),
