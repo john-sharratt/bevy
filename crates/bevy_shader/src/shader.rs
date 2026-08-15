@@ -252,6 +252,25 @@ pub enum ShaderLoaderError {
     Io(#[from] std::io::Error),
     #[error("Could not parse shader: {0}")]
     Parse(#[from] alloc::string::FromUtf8Error),
+    #[error("Could not parse shader: {0}")]
+    Utf8(#[from] core::str::Utf8Error),
+}
+
+/// Converts loaded shader bytes into source text.
+///
+/// Embedded shaders arrive as `Cow::Borrowed` static bytes, so this borrows through to a
+/// `&'static str` rather than copying the source into a fresh `String`. `Shader` stores its
+/// source as `Cow<'static, str>`, so the borrow survives all the way into the asset.
+fn shader_source_from_bytes(
+    bytes: Cow<'static, [u8]>,
+) -> Result<Cow<'static, str>, core::str::Utf8Error> {
+    Ok(match bytes {
+        Cow::Borrowed(bytes) => Cow::Borrowed(core::str::from_utf8(bytes)?),
+        Cow::Owned(bytes) => {
+            // Reuses the existing allocation; validation failure yields the same Utf8Error.
+            Cow::Owned(alloc::string::String::from_utf8(bytes).map_err(|err| err.utf8_error())?)
+        }
+    })
 }
 
 /// Settings for loading shaders.
@@ -292,9 +311,9 @@ impl AssetLoader for ShaderLoader {
         }
         let mut shader = match ext.as_str() {
             "spv" => Shader::from_spirv(bytes, load_context.path().path().to_string_lossy()),
-            "wgsl" => Shader::from_wgsl(String::from_utf8(bytes.into_owned())?, path),
+            "wgsl" => Shader::from_wgsl(shader_source_from_bytes(bytes)?, path),
             "wesl" => {
-                let mut shader = Shader::from_wesl(String::from_utf8(bytes.into_owned())?, path);
+                let mut shader = Shader::from_wesl(shader_source_from_bytes(bytes)?, path);
                 shader.shader_defs = settings.shader_defs.clone();
                 shader
             }
