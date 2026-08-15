@@ -92,6 +92,12 @@ impl From<std::io::Error> for AssetReaderError {
 // a higher maximum necessary.
 pub const STACK_FUTURE_SIZE: usize = 10 * size_of::<&()>();
 
+/// The size of the [`StackFuture`] returned by [`Reader::read_to_cow`].
+///
+/// Larger than [`STACK_FUTURE_SIZE`] because that future wraps the [`Reader::read_to_end`]
+/// `StackFuture` along with the `Vec` it accumulates into.
+pub const READ_TO_COW_FUTURE_SIZE: usize = 24 * size_of::<&()>();
+
 pub use stackfuture::StackFuture;
 
 /// A type returned from [`AssetReader::read`], which is used to read the contents of a file
@@ -148,16 +154,15 @@ pub trait Reader: AsyncRead + Unpin + Send + Sync {
     /// the number of memory copy operations when the data is stored in static memory.
     fn read_to_cow<'a>(
         &'a mut self,
-    ) -> Pin<Box<dyn Future<Output = std::io::Result<Cow<'static, [u8]>>> + 'a + Send>> {
-        let f = async move {
+    ) -> StackFuture<'a, std::io::Result<Cow<'static, [u8]>>, READ_TO_COW_FUTURE_SIZE> {
+        StackFuture::from(async move {
             if let Some(static_bytes) = self.as_static_bytes() {
                 return Ok(Cow::Borrowed(static_bytes));
             }
-            let mut bytes = Box::new(Vec::new());
+            let mut bytes = Vec::new();
             self.read_to_end(&mut bytes).await?;
-            Ok(Cow::Owned((*bytes).into()))
-        };
-        Box::pin(f)
+            Ok(Cow::Owned(bytes))
+        })
     }
 
     /// Returns the bytes as a static slice if the reader is backed by a piece of
