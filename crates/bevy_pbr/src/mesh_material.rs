@@ -36,7 +36,7 @@ use derive_more::derive::From;
 ///     ));
 /// }
 /// ```
-#[derive(Component, FromTemplate, Clone, Debug, Deref, DerefMut, Reflect, From)]
+#[derive(Component, FromTemplate, Clone, Debug, Deref, DerefMut, Reflect, Hash, From)]
 #[reflect(Component, Default, Clone, PartialEq)]
 pub struct MeshMaterial3d<M: Material>(pub Handle<M>);
 

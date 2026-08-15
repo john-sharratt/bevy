@@ -260,7 +260,7 @@ pub fn ktx2_buffer_to_image(
     // error cases have been handled
     let mut image = Image::default();
     image.texture_descriptor.format = texture_format;
-    image.data = Some(image_data);
+    image.data = Some(image_data.into());
     image.data_order = wgpu_types::TextureDataOrder::MipMajor;
     // Note: we must give wgpu the logical texture dimensions, so it can correctly compute mip sizes.
     // However this currently causes wgpu to panic if the dimensions arent a multiple of blocksize.

@@ -376,7 +376,7 @@ fn generate_random_compressed_texture_with_mipmaps(size: u32, bc4: bool, seed: u
             ..default()
         }),
 
-        data: Some(data),
+        data: Some(data.into()),
         ..Default::default()
     }
 }

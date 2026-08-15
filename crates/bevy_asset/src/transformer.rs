@@ -115,12 +115,13 @@ impl<A: Asset> TransformedAsset<A> {
     {
         let index = self.label_to_asset_index.get(label)?;
         let labeled = &mut self.labeled_assets[*index];
-        let value = labeled.asset.value.downcast_mut::<B>()?;
+        let asset = labeled.asset.as_mut()?;
+        let value = asset.value.downcast_mut::<B>()?;
         Some(TransformedSubAsset {
             value,
-            labeled_assets: &mut labeled.asset.labeled_assets,
-            label_to_asset_index: &mut labeled.asset.label_to_asset_index,
-            asset_id_to_asset_index: &mut labeled.asset.asset_id_to_asset_index,
+            labeled_assets: &mut asset.labeled_assets,
+            label_to_asset_index: &mut asset.label_to_asset_index,
+            asset_id_to_asset_index: &mut asset.asset_id_to_asset_index,
         })
     }
 
@@ -132,7 +133,7 @@ impl<A: Asset> TransformedAsset<A> {
     {
         let index = self.label_to_asset_index.get(label)?;
         let labeled = &self.labeled_assets[*index];
-        Some(&labeled.asset)
+        labeled.asset.as_ref()
     }
 
     /// Returns the labeled asset given its asset ID if it exists and matches the type.
@@ -145,12 +146,13 @@ impl<A: Asset> TransformedAsset<A> {
     ) -> Option<TransformedSubAsset<'_, B>> {
         let index = self.asset_id_to_asset_index.get(&id.into().untyped())?;
         let labeled = &mut self.labeled_assets[*index];
-        let value = labeled.asset.value.downcast_mut::<B>()?;
+        let asset = labeled.asset.as_mut()?;
+        let value = asset.value.downcast_mut::<B>()?;
         Some(TransformedSubAsset {
             value,
-            labeled_assets: &mut labeled.asset.labeled_assets,
-            label_to_asset_index: &mut labeled.asset.label_to_asset_index,
-            asset_id_to_asset_index: &mut labeled.asset.asset_id_to_asset_index,
+            labeled_assets: &mut asset.labeled_assets,
+            label_to_asset_index: &mut asset.label_to_asset_index,
+            asset_id_to_asset_index: &mut asset.asset_id_to_asset_index,
         })
     }
 
@@ -164,7 +166,7 @@ impl<A: Asset> TransformedAsset<A> {
     ) -> Option<&ErasedLoadedAsset> {
         let index = self.asset_id_to_asset_index.get(&id.into())?;
         let labeled = &self.labeled_assets[*index];
-        Some(&labeled.asset)
+        labeled.asset.as_ref()
     }
 
     /// Returns the [`UntypedHandle`] of the labeled asset with the provided 'label', if it exists.
@@ -200,7 +202,7 @@ impl<A: Asset> TransformedAsset<A> {
         asset: impl Into<ErasedLoadedAsset>,
     ) {
         let labeled = LabeledAsset {
-            asset: asset.into(),
+            asset: Some(asset.into()),
             handle: handle.into(),
         };
         match self.label_to_asset_index.entry(label.into()) {
@@ -286,12 +288,13 @@ impl<'a, A: Asset> TransformedSubAsset<'a, A> {
     {
         let index = self.label_to_asset_index.get(label)?;
         let labeled = &mut self.labeled_assets[*index];
-        let value = labeled.asset.value.downcast_mut::<B>()?;
+        let asset = labeled.asset.as_mut()?;
+        let value = asset.value.downcast_mut::<B>()?;
         Some(TransformedSubAsset {
             value,
-            labeled_assets: &mut labeled.asset.labeled_assets,
-            label_to_asset_index: &mut labeled.asset.label_to_asset_index,
-            asset_id_to_asset_index: &mut labeled.asset.asset_id_to_asset_index,
+            labeled_assets: &mut asset.labeled_assets,
+            label_to_asset_index: &mut asset.label_to_asset_index,
+            asset_id_to_asset_index: &mut asset.asset_id_to_asset_index,
         })
     }
 
@@ -303,7 +306,7 @@ impl<'a, A: Asset> TransformedSubAsset<'a, A> {
     {
         let index = self.label_to_asset_index.get(label)?;
         let labeled = &self.labeled_assets[*index];
-        Some(&labeled.asset)
+        labeled.asset.as_ref()
     }
 
     /// Returns the labeled asset given its asset ID if it exists and matches the type.
@@ -316,12 +319,13 @@ impl<'a, A: Asset> TransformedSubAsset<'a, A> {
     ) -> Option<TransformedSubAsset<'_, B>> {
         let index = self.asset_id_to_asset_index.get(&id.into().untyped())?;
         let labeled = &mut self.labeled_assets[*index];
-        let value = labeled.asset.value.downcast_mut::<B>()?;
+        let asset = labeled.asset.as_mut()?;
+        let value = asset.value.downcast_mut::<B>()?;
         Some(TransformedSubAsset {
             value,
-            labeled_assets: &mut labeled.asset.labeled_assets,
-            label_to_asset_index: &mut labeled.asset.label_to_asset_index,
-            asset_id_to_asset_index: &mut labeled.asset.asset_id_to_asset_index,
+            labeled_assets: &mut asset.labeled_assets,
+            label_to_asset_index: &mut asset.label_to_asset_index,
+            asset_id_to_asset_index: &mut asset.asset_id_to_asset_index,
         })
     }
 
@@ -335,7 +339,7 @@ impl<'a, A: Asset> TransformedSubAsset<'a, A> {
     ) -> Option<&ErasedLoadedAsset> {
         let index = self.asset_id_to_asset_index.get(&id.into())?;
         let labeled = &self.labeled_assets[*index];
-        Some(&labeled.asset)
+        labeled.asset.as_ref()
     }
 
     /// Returns the [`UntypedHandle`] of the labeled asset with the provided 'label', if it exists.
@@ -371,7 +375,7 @@ impl<'a, A: Asset> TransformedSubAsset<'a, A> {
         asset: impl Into<ErasedLoadedAsset>,
     ) {
         let labeled = LabeledAsset {
-            asset: asset.into(),
+            asset: Some(asset.into()),
             handle: handle.into(),
         };
         match self.label_to_asset_index.entry(label.into()) {

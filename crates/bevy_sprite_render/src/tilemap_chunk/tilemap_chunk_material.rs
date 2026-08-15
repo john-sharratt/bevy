@@ -95,7 +95,7 @@ impl From<Option<TileData>> for PackedTileData {
 
 pub fn make_chunk_tile_data_image(size: &UVec2, data: &[PackedTileData]) -> Image {
     Image {
-        data: Some(bytemuck::cast_slice(data).to_vec()),
+        data: Some(bytemuck::cast_slice(data).to_vec().into()),
         data_order: TextureDataOrder::default(),
         texture_descriptor: TextureDescriptor {
             size: size.to_extents(),

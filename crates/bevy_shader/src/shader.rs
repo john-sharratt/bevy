@@ -341,8 +341,7 @@ impl AssetLoader for ShaderLoader {
         // On windows, the path will inconsistently use \ or /.
         // TODO: remove this once AssetPath forces cross-platform "slash" consistency. See #10511
         let path = path.replace(std::path::MAIN_SEPARATOR, "/");
-        let mut bytes = Vec::new();
-        reader.read_to_end(&mut bytes).await?;
+        let bytes = reader.read_to_cow().await?;
         if ext != "wgsl" && !settings.shader_defs.is_empty() {
             tracing::warn!(
                 "Tried to load a non-wgsl shader with shader defs, this isn't supported: \
@@ -352,19 +351,19 @@ impl AssetLoader for ShaderLoader {
         let mut shader = match ext {
             "spv" => Shader::from_spirv(bytes, load_context.path().path().to_string_lossy()),
             "wgsl" => Shader::from_wgsl_with_defs(
-                String::from_utf8(bytes)?,
+                String::from_utf8(bytes.into_owned())?,
                 path,
                 settings.shader_defs.clone(),
             ),
-            "vert" => Shader::from_glsl(String::from_utf8(bytes)?, naga::ShaderStage::Vertex, path),
+            "vert" => Shader::from_glsl(String::from_utf8(bytes.into_owned())?, naga::ShaderStage::Vertex, path),
             "frag" => {
-                Shader::from_glsl(String::from_utf8(bytes)?, naga::ShaderStage::Fragment, path)
+                Shader::from_glsl(String::from_utf8(bytes.into_owned())?, naga::ShaderStage::Fragment, path)
             }
             "comp" => {
-                Shader::from_glsl(String::from_utf8(bytes)?, naga::ShaderStage::Compute, path)
+                Shader::from_glsl(String::from_utf8(bytes.into_owned())?, naga::ShaderStage::Compute, path)
             }
             #[cfg(feature = "shader_format_wesl")]
-            "wesl" => Shader::from_wesl(String::from_utf8(bytes)?, path),
+            "wesl" => Shader::from_wesl(String::from_utf8(bytes.into_owned())?, path),
             _ => panic!("unhandled extension: {ext}"),
         };
 

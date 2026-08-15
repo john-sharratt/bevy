@@ -891,7 +891,11 @@ impl AssetServer {
                                 let error = AssetLoadError::RequestedHandleTypeMismatch {
                                     path: path.clone(),
                                     requested: asset_id.type_id,
-                                    actual_asset_name: labeled_asset.asset.value.asset_type_name(),
+                                    actual_asset_name: labeled_asset
+                                        .asset
+                                        .as_ref()
+                                        .map(|asset| asset.value.asset_type_name())
+                                        .unwrap_or("<labeled asset handle>"),
                                     loader_name: loader.type_path(),
                                 };
                                 self.send_asset_event(InternalAssetEvent::Failed {

@@ -5,6 +5,7 @@ mod khr_materials_clearcoat;
 mod khr_materials_specular;
 
 use alloc::sync::Arc;
+use std::borrow::Cow;
 use async_lock::RwLock;
 
 use bevy_asset::{Handle, LoadContext};
@@ -165,7 +166,7 @@ pub trait GltfExtensionHandler: Send + Sync + 'static {
         gltf_document: &gltf::Gltf,
         gltf_mesh: &gltf::Mesh,
         gltf_primitive: &gltf::Primitive,
-        buffer_data: &[Vec<u8>],
+        buffer_data: &[Cow<'static, [u8]>],
         custom_vertex_attributes: &HashMap<Box<str>, MeshVertexAttribute>,
         gltf_mesh_on_skinned_nodes: bool,
         gltf_mesh_on_non_skinned_nodes: bool,
@@ -330,7 +331,7 @@ pub trait ErasedGltfExtensionHandler: Send + Sync + 'static {
         gltf_document: &'a gltf::Gltf,
         gltf_mesh: &'a gltf::Mesh,
         gltf_primitive: &'a gltf::Primitive,
-        buffer_data: &'a [Vec<u8>],
+        buffer_data: &'a [Cow<'static, [u8]>],
         custom_vertex_attributes: &'a HashMap<Box<str>, MeshVertexAttribute>,
         gltf_mesh_on_skinned_nodes: bool,
         gltf_mesh_on_non_skinned_nodes: bool,
@@ -467,7 +468,7 @@ impl<H: GltfExtensionHandler> ErasedGltfExtensionHandler for H {
         gltf_document: &'a gltf::Gltf,
         gltf_mesh: &'a gltf::Mesh,
         gltf_primitive: &'a gltf::Primitive,
-        buffer_data: &'a [Vec<u8>],
+        buffer_data: &'a [Cow<'static, [u8]>],
         custom_vertex_attributes: &'a HashMap<Box<str>, MeshVertexAttribute>,
         gltf_mesh_on_skinned_nodes: bool,
         gltf_mesh_on_non_skinned_nodes: bool,
