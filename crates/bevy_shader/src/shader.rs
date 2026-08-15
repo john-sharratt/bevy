@@ -283,8 +283,7 @@ impl AssetLoader for ShaderLoader {
         // On windows, the path will inconsistently use \ or /.
         // TODO: remove this once AssetPath forces cross-platform "slash" consistency. See #10511
         let path = path.replace(std::path::MAIN_SEPARATOR, "/");
-        let mut bytes = Vec::new();
-        reader.read_to_end(&mut bytes).await?;
+        let bytes = reader.read_to_cow().await?;
         if ext != "wesl" && !settings.shader_defs.is_empty() {
             tracing::warn!(
                 "Tried to load a non-wesl shader with shader defs, this isn't supported: \
@@ -293,9 +292,9 @@ impl AssetLoader for ShaderLoader {
         }
         let mut shader = match ext.as_str() {
             "spv" => Shader::from_spirv(bytes, load_context.path().path().to_string_lossy()),
-            "wgsl" => Shader::from_wgsl(String::from_utf8(bytes)?, path),
+            "wgsl" => Shader::from_wgsl(String::from_utf8(bytes.into_owned())?, path),
             "wesl" => {
-                let mut shader = Shader::from_wesl(String::from_utf8(bytes)?, path);
+                let mut shader = Shader::from_wesl(String::from_utf8(bytes.into_owned())?, path);
                 shader.shader_defs = settings.shader_defs.clone();
                 shader
             }

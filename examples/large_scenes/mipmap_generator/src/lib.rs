@@ -428,7 +428,7 @@ pub fn generate_mips_texture(
                 image.texture_descriptor.view_formats = &[];
             }
 
-            image.data = Some(new_image_data);
+            image.data = Some(new_image_data.into());
             Ok(())
         }
         Err(e) => Err(e),
@@ -593,7 +593,11 @@ pub fn extract_mip_level(image: &Image, mip_level: u32) -> anyhow::Result<Image>
         data: image
             .data
             .as_ref()
-            .map(|data| data[byte_offset..byte_offset + (width * block_size * height)].to_vec()),
+            .map(|data| {
+                data[byte_offset..byte_offset + (width * block_size * height)]
+                    .to_vec()
+                    .into()
+            }),
         data_order: TextureDataOrder::default(),
         texture_descriptor: new_descriptor,
         sampler: image.sampler.clone(),
@@ -690,7 +694,7 @@ impl<T: GetImages + MaterialExtension> GetImages for ExtendedMaterial<StandardMa
 }
 
 pub fn try_into_dynamic(image: Image) -> anyhow::Result<DynamicImage> {
-    let Some(image_data) = image.data else {
+    let Some(image_data) = image.data.map(std::borrow::Cow::into_owned) else {
         return Err(anyhow!(
             "Conversion into dynamic image not supported for GPU storage texture."
         ));

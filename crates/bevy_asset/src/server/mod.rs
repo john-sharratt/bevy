@@ -895,8 +895,9 @@ impl AssetServer {
                                         requested: asset_id.type_id,
                                         actual_asset_name: labeled_asset
                                             .asset
-                                            .value
-                                            .asset_type_name(),
+                                            .as_ref()
+                                            .map(|asset| asset.value.asset_type_name())
+                                            .unwrap_or("<labeled asset handle>"),
                                         loader_name: loader.type_path(),
                                     })
                                     .into();

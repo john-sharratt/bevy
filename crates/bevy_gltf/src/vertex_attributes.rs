@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use bevy_mesh::{Mesh, MeshVertexAttribute, VertexAttributeValues as Values, VertexFormat};
 use bevy_platform::collections::HashMap;
 use gltf::{
@@ -42,7 +44,7 @@ pub enum AccessFailed {
 /// Helper for reading buffer data
 struct BufferAccessor<'a> {
     accessor: gltf::Accessor<'a>,
-    buffer_data: &'a Vec<Vec<u8>>,
+    buffer_data: &'a Vec<Cow<'static, [u8]>>,
     normalization: Normalization,
 }
 
@@ -50,7 +52,7 @@ impl<'a> BufferAccessor<'a> {
     /// Creates an iterator over the elements in this accessor
     fn iter<T: gltf::accessor::Item>(self) -> Result<gltf::accessor::Iter<'a, T>, AccessFailed> {
         gltf::accessor::Iter::new(self.accessor, |buffer: gltf::Buffer| {
-            self.buffer_data.get(buffer.index()).map(Vec::as_slice)
+            self.buffer_data.get(buffer.index()).map(AsRef::as_ref)
         })
         .ok_or(AccessFailed::MalformedData)
     }
@@ -104,7 +106,7 @@ impl<'a> VertexAttributeIter<'a> {
     /// Creates an iterator over the elements in a vertex attribute accessor
     fn from_accessor(
         accessor: gltf::Accessor<'a>,
-        buffer_data: &'a Vec<Vec<u8>>,
+        buffer_data: &'a Vec<Cow<'static, [u8]>>,
     ) -> Result<VertexAttributeIter<'a>, AccessFailed> {
         let normalization = Normalization(accessor.normalized());
         let format = (accessor.data_type(), accessor.dimensions());
@@ -280,7 +282,7 @@ pub enum ConvertAttributeError {
 pub fn convert_attribute(
     semantic: gltf::Semantic,
     accessor: gltf::Accessor,
-    buffer_data: &Vec<Vec<u8>>,
+    buffer_data: &Vec<Cow<'static, [u8]>>,
     custom_vertex_attributes: &HashMap<Box<str>, MeshVertexAttribute>,
     convert_coordinates: bool,
 ) -> Result<(MeshVertexAttribute, Values), ConvertAttributeError> {

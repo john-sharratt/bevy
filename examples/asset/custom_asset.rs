@@ -1,5 +1,7 @@
 //! Implements loader for a custom asset type.
 
+use std::borrow::Cow;
+
 use bevy::{
     asset::{io::Reader, AssetLoader, LoadContext},
     prelude::*,
@@ -42,8 +44,7 @@ impl AssetLoader for CustomAssetLoader {
         _settings: &(),
         _load_context: &mut LoadContext<'_>,
     ) -> Result<Self::Asset, Self::Error> {
-        let mut bytes = Vec::new();
-        reader.read_to_end(&mut bytes).await?;
+        let bytes = reader.read_to_cow().await?;
         let custom_asset = ron::de::from_bytes::<CustomAsset>(&bytes)?;
         Ok(custom_asset)
     }
@@ -55,7 +56,7 @@ impl AssetLoader for CustomAssetLoader {
 
 #[derive(Asset, TypePath, Debug)]
 struct Blob {
-    bytes: Vec<u8>,
+    bytes: Cow<'static, [u8]>,
 }
 
 #[derive(Default, TypePath)]
@@ -82,8 +83,7 @@ impl AssetLoader for BlobAssetLoader {
         _load_context: &mut LoadContext<'_>,
     ) -> Result<Self::Asset, Self::Error> {
         info!("Loading Blob...");
-        let mut bytes = Vec::new();
-        reader.read_to_end(&mut bytes).await?;
+        let bytes = reader.read_to_cow().await?;
 
         Ok(Blob { bytes })
     }

@@ -5,7 +5,7 @@ use core::ops::Deref;
 #[cfg(feature = "bevy_animation")]
 use bevy_animation::AnimationClip;
 use bevy_asset::{Asset, Handle};
-use bevy_ecs::{component::Component, reflect::ReflectComponent};
+use bevy_ecs::{component::Component, entity::Entity, reflect::ReflectComponent};
 use bevy_mesh::{skinning::SkinnedMeshInverseBindposes, Mesh};
 use bevy_platform::collections::HashMap;
 use bevy_reflect::{prelude::ReflectDefault, Reflect, TypePath};
@@ -30,6 +30,8 @@ pub struct Gltf {
     pub named_materials: HashMap<Box<str>, Handle<GltfMaterial>>,
     /// All nodes loaded from the glTF file.
     pub nodes: Vec<Handle<GltfNode>>,
+    /// List of all the lights spawned within the scene
+    pub lights: HashMap<usize, Vec<Entity>>,
     /// Named nodes loaded from the glTF file.
     pub named_nodes: HashMap<Box<str>, Handle<GltfNode>>,
     /// All skins loaded from the glTF file.

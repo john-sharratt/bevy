@@ -19,6 +19,7 @@ use bevy_color::{Color, ColorToComponents, Gray, LinearRgba, Srgba, Xyza};
 use bevy_ecs::resource::Resource;
 use bevy_math::{AspectRatio, UVec2, UVec3, Vec2};
 use core::hash::Hash;
+use std::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use wgpu_types::{
@@ -645,7 +646,7 @@ pub struct Image {
     /// If the image is being used as a storage texture which doesn't need to be initialized by the
     /// CPU, then this should be `None`.
     /// Otherwise, it should always be `Some`.
-    pub data: Option<Vec<u8>>,
+    pub data: Option<Cow<'static, [u8]>>,
     /// For texture data with layers and mips, this field controls how wgpu interprets the buffer layout.
     ///
     /// Use [`TextureDataOrder::default()`] for all other cases.
@@ -1111,14 +1112,17 @@ impl Default for Image {
     /// default is a 1x1x1 all '1.0' texture
     fn default() -> Self {
         let mut image = Image::default_uninit();
-        image.data = Some(vec![
-            255;
-            image
-                .texture_descriptor
-                .format
-                .pixel_size()
-                .unwrap_or(0)
-        ]);
+        image.data = Some(
+            vec![
+                255;
+                image
+                    .texture_descriptor
+                    .format
+                    .pixel_size()
+                    .unwrap_or(0)
+            ]
+            .into(),
+        );
         image
     }
 }
@@ -1144,7 +1148,7 @@ impl Image {
             );
         }
         let mut image = Image::new_uninit(size, dimension, format, asset_usage);
-        image.data = Some(data);
+        image.data = Some(data.into());
         image
     }
 
@@ -1283,7 +1287,7 @@ impl Image {
         ];
 
         Image {
-            data: Some(data),
+            data: Some(data.into()),
             data_order: TextureDataOrder::default(),
             texture_descriptor: TextureDescriptor {
                 size,
@@ -1349,7 +1353,7 @@ impl Image {
         if let Some(ref mut data) = self.data
             && let Ok(pixel_size) = self.texture_descriptor.format.pixel_size()
         {
-            data.resize(pixel_count(size) * pixel_size, 0);
+            data.to_mut().resize(pixel_count(size) * pixel_size, 0);
         }
     }
 
@@ -1411,7 +1415,7 @@ impl Image {
                 }
             }
 
-            self.data = Some(new);
+            self.data = Some(new.into());
         }
     }
 
@@ -1527,7 +1531,7 @@ impl Image {
                     }
                 }
 
-                Some(new_data)
+                Some(Cow::Owned(new_data))
             }
             None => None,
         };
@@ -1714,7 +1718,7 @@ impl Image {
             return Err(TextureAccessError::Uninitialized);
         };
 
-        Ok(&mut data[offset..(offset + len)])
+        Ok(&mut data.to_mut()[offset..(offset + len)])
     }
 
     /// Clears the content of the image with the given pixel. The image needs to be initialized on
@@ -1737,7 +1741,7 @@ impl Image {
                 "Clear data must fit within pixel buffer (expected {byte_len}B).",
             );
             if let Some(data) = self.data.as_mut() {
-                for pixel_data in data.chunks_mut(pixel_size) {
+                for pixel_data in data.to_mut().chunks_mut(pixel_size) {
                     pixel_data.copy_from_slice(pixel);
                 }
             }

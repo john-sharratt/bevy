@@ -209,14 +209,14 @@ impl<'a, 'b, A: Asset> SavedAsset<'a, 'b, A> {
     pub fn get_labeled<B: Asset>(&self, label: impl AsRef<str>) -> Option<SavedAsset<'a, '_, B>> {
         let index = self.label_to_asset_index.get(label.as_ref())?;
         let labeled = &self.labeled_assets[*index];
-        labeled.asset.downcast()
+        labeled.asset.as_ref()?.downcast()
     }
 
     /// Returns the type-erased labeled asset, if it exists and matches this type.
     pub fn get_erased_labeled(&self, label: impl AsRef<str>) -> Option<&ErasedSavedAsset<'a, '_>> {
         let index = self.label_to_asset_index.get(label.as_ref())?;
         let labeled = &self.labeled_assets[*index];
-        Some(&labeled.asset)
+        labeled.asset.as_ref()
     }
 
     /// Returns the labeled asset given its asset ID if it exists and matches the type.
@@ -229,7 +229,7 @@ impl<'a, 'b, A: Asset> SavedAsset<'a, 'b, A> {
     ) -> Option<SavedAsset<'a, '_, B>> {
         let index = self.asset_id_to_asset_index.get(&id.into().untyped())?;
         let labeled = &self.labeled_assets[*index];
-        labeled.asset.downcast()
+        labeled.asset.as_ref()?.downcast()
     }
 
     /// Returns the type-erased labeled asset given its asset ID if it exists.
@@ -242,7 +242,7 @@ impl<'a, 'b, A: Asset> SavedAsset<'a, 'b, A> {
     ) -> Option<&ErasedSavedAsset<'a, '_>> {
         let index = self.asset_id_to_asset_index.get(&id.into())?;
         let labeled = &self.labeled_assets[*index];
-        Some(&labeled.asset)
+        labeled.asset.as_ref()
     }
 
     /// Returns the [`UntypedHandle`] of the labeled asset with the provided 'label', if it exists.
@@ -322,8 +322,11 @@ impl<'a> ErasedSavedAsset<'a, '_> {
 /// assets).
 #[derive(Clone)]
 struct LabeledSavedAsset<'a> {
-    /// The asset and its labeled assets.
-    asset: ErasedSavedAsset<'a, 'a>,
+    /// The asset and its labeled assets. `None` when this label only carries a handle
+    /// to an asset owned by another load context (see
+    /// `LoadContext::add_labeled_asset_handle`); the entry is kept so indices stay
+    /// aligned with `label_to_asset_index`.
+    asset: Option<ErasedSavedAsset<'a, 'a>>,
     /// The handle of this labeled asset.
     handle: UntypedHandle,
 }
@@ -332,7 +335,7 @@ impl<'a> LabeledSavedAsset<'a> {
     /// Creates an instance that corresponds to the same data as [`LabeledAsset`].
     fn from_labeled_asset(asset: &'a LabeledAsset) -> Self {
         Self {
-            asset: ErasedSavedAsset::from_loaded(&asset.asset),
+            asset: asset.asset.as_ref().map(ErasedSavedAsset::from_loaded),
             handle: asset.handle.clone(),
         }
     }
@@ -463,7 +466,10 @@ impl<'a> SavedAssetBuilder<'a> {
         handle: UntypedHandle,
     ) {
         // TODO: Check asset and handle have the same type.
-        let labeled = LabeledSavedAsset { asset, handle };
+        let labeled = LabeledSavedAsset {
+            asset: Some(asset),
+            handle,
+        };
         match self.label_to_asset_index.entry(label.into()) {
             Entry::Occupied(entry) => {
                 let labeled_entry = &mut self.labeled_assets[*entry.get()];
