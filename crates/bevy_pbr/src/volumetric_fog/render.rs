@@ -638,16 +638,22 @@ pub fn prepare_volumetric_fog_uniforms(
         return;
     };
 
+    // A single shared default, so entities without explicit `RenderLayers` compare by
+    // pointer in `RenderLayers::intersects` rather than allocating a fresh one per pair.
+    let default_render_layers = RenderLayers::default();
+
     for (view_entity, extracted_view, volumetric_fog, view_render_layers) in view_targets.iter() {
         let world_from_view = extracted_view.world_from_view.affine();
 
         let mut view_fog_volumes = vec![];
+        let view_layers = view_render_layers.unwrap_or(&default_render_layers);
 
         for ((_, fog_volume, _, fog_render_layers), local_from_world) in
             fog_volumes.iter().zip(local_from_world_matrices.iter())
         {
             // The render layers must match
-            if !fog_render_layers.cloned().unwrap_or_default().intersects(&view_render_layers.cloned().unwrap_or_default()) {
+            let fog_layers = fog_render_layers.unwrap_or(&default_render_layers);
+            if !fog_layers.intersects(view_layers) {
                 continue;
             }
 
