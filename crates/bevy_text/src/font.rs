@@ -10,7 +10,9 @@ use bevy_ecs::system::Query;
 use bevy_ecs::system::ResMut;
 use bevy_platform::collections::HashSet;
 use bevy_reflect::TypePath;
+use alloc::sync::Arc;
 use parley::fontique::Blob;
+use std::borrow::Cow;
 use parley::fontique::FontInfoOverride;
 use parley::FontFamilyName;
 
@@ -39,6 +41,21 @@ impl Font {
     pub fn from_bytes(font_data: Vec<u8>) -> Font {
         Self {
             data: Blob::from(font_data),
+            alias: String::new(),
+        }
+    }
+
+    /// Creates a [`Font`] from copy-on-write bytes.
+    ///
+    /// Static bytes — an `include_bytes!` font, say — are wrapped in an [`Arc`] rather than
+    /// copied, so only the handle is allocated and not the whole font file.
+    pub fn from_cow(font_data: Cow<'static, [u8]>) -> Font {
+        let data = match font_data {
+            Cow::Borrowed(bytes) => Blob::new(Arc::new(bytes)),
+            Cow::Owned(bytes) => Blob::from(bytes),
+        };
+        Self {
+            data,
             alias: String::new(),
         }
     }

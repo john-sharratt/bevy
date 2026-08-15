@@ -30,7 +30,7 @@ impl AssetLoader for FontLoader {
         _load_context: &mut LoadContext<'_>,
     ) -> Result<Font, Self::Error> {
         let bytes = reader.read_to_cow().await?;
-        let font = Font::from_bytes(bytes.into_owned());
+        let font = Font::from_cow(bytes);
         Ok(font)
     }
 
