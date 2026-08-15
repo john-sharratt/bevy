@@ -48,12 +48,15 @@ pub mod prelude {
     pub use disqualified::ShortName;
 }
 
+mod cow_arc;
 mod debug_info;
 mod default;
 mod once;
 
 #[doc(hidden)]
 pub use once::OnceFlag;
+
+pub use cow_arc::*;
 
 pub use default::default;
 

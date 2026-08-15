@@ -2,7 +2,7 @@ mod extensions;
 mod gltf_ext;
 
 use alloc::sync::Arc;
-use std::{io::Error, sync::Mutex};
+use std::{borrow::Cow, io::Error, sync::Mutex};
 
 #[cfg(feature = "bevy_animation")]
 use bevy_animation::{prelude::*, AnimationTarget, AnimationTargetId};
@@ -39,7 +39,6 @@ use bevy_platform::collections::{HashMap, HashSet};
 use bevy_render::render_resource::Face;
 use bevy_scene::Scene;
 #[cfg(not(target_arch = "wasm32"))]
-use bevy_tasks::IoTaskPool;
 use bevy_transform::components::Transform;
 
 use gltf::{
@@ -595,51 +594,23 @@ impl GltfLoader {
         // later in the loader when looking up handles for materials. However this would mean
         // that the material's load context would no longer track those images as dependencies.
         let mut _texture_handles = Vec::new();
-        if gltf.textures().len() == 1 || cfg!(target_arch = "wasm32") {
-            for texture in gltf.textures() {
-                let image = load_image(
-                    texture,
-                    &buffer_data,
-                    &linear_textures,
-                    load_context.asset_path(),
-                    loader.supported_compressed_formats,
-                    default_sampler,
-                    settings,
-                )
-                .await?;
-                image.process_loaded_texture(load_context, &mut _texture_handles);
-            }
-        } else {
-            #[cfg(not(target_arch = "wasm32"))]
-            IoTaskPool::get()
-                .scope(|scope| {
-                    gltf.textures().for_each(|gltf_texture| {
-                        let asset_path = load_context.asset_path().clone();
-                        let linear_textures = &linear_textures;
-                        let buffer_data = &buffer_data;
-                        scope.spawn(async move {
-                            load_image(
-                                gltf_texture,
-                                buffer_data,
-                                linear_textures,
-                                &asset_path,
-                                loader.supported_compressed_formats,
-                                default_sampler,
-                                settings,
-                            )
-                            .await
-                        });
-                    });
-                })
-                .into_iter()
-                .for_each(|result| match result {
-                    Ok(image) => {
-                        image.process_loaded_texture(load_context, &mut _texture_handles);
-                    }
-                    Err(err) => {
-                        warn!("Error loading glTF texture: {}", err);
-                    }
-                });
+        // NOTE (fork): textures are always loaded serially here. Upstream loads them in
+        // parallel on an `IoTaskPool` scope when a glTF has more than one texture, but that
+        // path panics/overflows the stack when several glTFs load concurrently.
+        // See https://github.com/bevyengine/bevy/issues/15271 — restore the upstream
+        // parallel path once that is fixed.
+        for texture in gltf.textures() {
+            let image = load_image(
+                texture,
+                &buffer_data,
+                &linear_textures,
+                load_context.asset_path(),
+                loader.supported_compressed_formats,
+                default_sampler,
+                settings,
+            )
+            .await?;
+            image.process_loaded_texture(load_context, &mut _texture_handles);
         }
 
         let mut materials = vec![];
@@ -707,7 +678,7 @@ impl GltfLoader {
 
                 // Read vertex indices
                 let reader =
-                    primitive.reader(|buffer| Some(buffer_data[buffer.index()].as_slice()));
+                    primitive.reader(|buffer| Some(buffer_data[buffer.index()].as_ref()));
                 if let Some(indices) = reader.read_indices() {
                     mesh.insert_indices(match indices {
                         ReadIndices::U8(is) => Indices::U16(is.map(|x| x as u16).collect()),
@@ -941,6 +912,7 @@ impl GltfLoader {
 
         let mut scenes = vec![];
         let mut named_scenes = <HashMap<_, _>>::default();
+        let mut lights = Default::default();
         let mut active_camera_found = false;
         for scene in gltf.scenes() {
             let mut err = None;
@@ -962,6 +934,7 @@ impl GltfLoader {
                             &mut node_index_to_entity_map,
                             &mut entity_to_skin_index_map,
                             &mut active_camera_found,
+                            &mut lights,
                             &Transform::default(),
                             #[cfg(feature = "bevy_animation")]
                             &animation_roots,
@@ -1041,6 +1014,7 @@ impl GltfLoader {
             named_materials,
             nodes,
             named_nodes,
+            lights,
             #[cfg(feature = "bevy_animation")]
             animations,
             #[cfg(feature = "bevy_animation")]
@@ -1064,8 +1038,7 @@ impl AssetLoader for GltfLoader {
         settings: &GltfLoaderSettings,
         load_context: &mut LoadContext<'_>,
     ) -> Result<Gltf, Self::Error> {
-        let mut bytes = Vec::new();
-        reader.read_to_end(&mut bytes).await?;
+        let bytes = reader.read_to_cow().await?;
 
         Self::load_gltf(self, &bytes, load_context, settings).await
     }
@@ -1078,7 +1051,7 @@ impl AssetLoader for GltfLoader {
 /// Loads a glTF texture as a bevy [`Image`] and returns it together with its label.
 async fn load_image<'a, 'b>(
     gltf_texture: gltf::Texture<'a>,
-    buffer_data: &[Vec<u8>],
+    buffer_data: &[Cow<'static, [u8]>],
     linear_textures: &HashSet<usize>,
     gltf_path: &'b AssetPath<'b>,
     supported_compressed_formats: CompressedImageFormats,
@@ -1115,7 +1088,15 @@ async fn load_image<'a, 'b>(
                 .decode_utf8()
                 .unwrap();
             let uri = uri.as_ref();
-            if let Ok(data_uri) = DataUri::parse(uri) {
+            if uri.contains("://") {
+                // Absolute URI: hand it to the asset server rather than resolving it
+                // relative to the glTF, so the source can be shared between glTFs.
+                Ok(ImageOrPath::AssetPath {
+                    path: uri.to_string().into(),
+                    is_srgb,
+                    sampler_descriptor,
+                })
+            } else if let Ok(data_uri) = DataUri::parse(uri) {
                 let bytes = data_uri.decode()?;
                 let image_type = ImageType::MimeType(data_uri.mime_type);
                 Ok(ImageOrPath::Image {
@@ -1408,6 +1389,7 @@ fn load_node(
     node_index_to_entity_map: &mut HashMap<usize, Entity>,
     entity_to_skin_index_map: &mut EntityHashMap<usize>,
     active_camera_found: &mut bool,
+    lights: &mut HashMap<usize, Vec<Entity>>,
     parent_transform: &Transform,
     #[cfg(feature = "bevy_animation")] animation_roots: &HashSet<usize>,
     #[cfg(feature = "bevy_animation")] mut animation_context: Option<AnimationContext>,
@@ -1672,6 +1654,12 @@ fn load_node(
                             value: extras.get().to_string(),
                         });
                     }
+                    // NOTE (fork): only spot lights are recorded in `Gltf::lights`.
+                    // Directional and point lights are deliberately not tracked here.
+                    lights
+                        .entry(gltf_node.index())
+                        .or_default()
+                        .push(entity.id());
                 }
             }
         }
@@ -1687,6 +1675,7 @@ fn load_node(
                 node_index_to_entity_map,
                 entity_to_skin_index_map,
                 active_camera_found,
+                lights,
                 &world_transform,
                 #[cfg(feature = "bevy_animation")]
                 animation_roots,
@@ -1725,7 +1714,7 @@ fn load_node(
 async fn load_buffers(
     gltf: &gltf::Gltf,
     load_context: &mut LoadContext<'_>,
-) -> Result<Vec<Vec<u8>>, GltfError> {
+) -> Result<Vec<Cow<'static, [u8]>>, GltfError> {
     const VALID_MIME_TYPES: &[&str] = &["application/octet-stream", "application/gltf-buffer"];
 
     let mut buffer_data = Vec::new();
@@ -1738,7 +1727,7 @@ async fn load_buffers(
                 let uri = uri.as_ref();
                 let buffer_bytes = match DataUri::parse(uri) {
                     Ok(data_uri) if VALID_MIME_TYPES.contains(&data_uri.mime_type) => {
-                        data_uri.decode()?
+                        Cow::Owned(data_uri.decode()?)
                     }
                     Ok(_) => return Err(GltfError::BufferFormatUnsupported),
                     Err(()) => {
@@ -1754,7 +1743,7 @@ async fn load_buffers(
             }
             gltf::buffer::Source::Bin => {
                 if let Some(blob) = gltf.blob.as_deref() {
-                    buffer_data.push(blob.into());
+                    buffer_data.push(Cow::Owned(blob.into()));
                 } else {
                     return Err(GltfError::MissingBlob);
                 }
@@ -1812,6 +1801,14 @@ enum ImageOrPath {
         is_srgb: bool,
         sampler_descriptor: ImageSamplerDescriptor,
     },
+    /// A texture referenced by an absolute URI (one containing a `://` scheme) rather than
+    /// a path relative to the glTF. Loaded through the asset server so the same remote or
+    /// aliased source is shared between glTFs instead of being re-decoded per file.
+    AssetPath {
+        path: AssetPath<'static>,
+        is_srgb: bool,
+        sampler_descriptor: ImageSamplerDescriptor,
+    },
 }
 
 impl ImageOrPath {
@@ -1830,6 +1827,11 @@ impl ImageOrPath {
                 load_context.add_labeled_asset(label.to_string(), image)
             }
             ImageOrPath::Path {
+                path,
+                is_srgb,
+                sampler_descriptor,
+            }
+            | ImageOrPath::AssetPath {
                 path,
                 is_srgb,
                 sampler_descriptor,

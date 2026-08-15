@@ -373,7 +373,7 @@ pub fn stbn_placeholder() -> Image {
     let format = TextureFormat::Rgba8Unorm;
     let data = vec![255, 0, 255, 255];
     Image {
-        data: Some(data),
+        data: Some(data.into()),
         data_order: TextureDataOrder::default(),
         texture_descriptor: TextureDescriptor {
             size: Extent3d::default(),

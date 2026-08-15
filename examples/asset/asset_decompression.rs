@@ -56,11 +56,9 @@ impl AssetLoader for GzAssetLoader {
             .ok_or(GzAssetLoaderError::IndeterminateFilePath)?;
         let contained_path = compressed_path.join(uncompressed_file_name);
 
-        let mut bytes_compressed = Vec::new();
+        let bytes_compressed = reader.read_to_cow().await?;
 
-        reader.read_to_end(&mut bytes_compressed).await?;
-
-        let mut decoder = GzDecoder::new(bytes_compressed.as_slice());
+        let mut decoder = GzDecoder::new(bytes_compressed.as_ref());
 
         let mut bytes_uncompressed = Vec::new();
 

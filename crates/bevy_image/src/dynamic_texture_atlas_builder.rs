@@ -106,6 +106,7 @@ impl DynamicTextureAtlasBuilder {
             let end = begin + rect_width * format_size;
             let texture_begin = texture_y * rect_width * format_size;
             let texture_end = texture_begin + rect_width * format_size;
+            let atlas_data = atlas_data.to_mut();
             atlas_data[begin..end].copy_from_slice(&data[texture_begin..texture_end]);
         }
         Ok(())

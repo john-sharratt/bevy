@@ -235,6 +235,7 @@ fn update_tilemap_chunk_indices(
             );
             continue;
         };
+        let data = data.to_mut();
         data.clear();
         data.extend_from_slice(bytemuck::cast_slice(&packed_tile_data));
     }
