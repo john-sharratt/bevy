@@ -175,9 +175,26 @@ fn read_to_cow<'a>(&'a mut self)
 fn as_static_bytes(&self) -> Option<&'static [u8]> { None }   // see INV-1
 ```
 
-`LoadContext::read_asset_bytes` widened from `Vec<u8>` to `Cow<'static, [u8]>`, and eleven loaders
-now call `read_to_cow()`: image, HDR, EXR, glTF, shader, font, animation graph, audio, plus test and
-example loaders.
+`LoadContext::read_asset_bytes` widened from `Vec<u8>` to `Cow<'static, [u8]>`, and every real
+`AssetLoader` in the workspace now calls `read_to_cow()`: image, HDR, EXR, glTF, shader, font,
+animation graph, audio, world serialization, plus test and example loaders.
+
+`read_to_cow` returns a `StackFuture`, not a boxed future, so a read costs no allocation of its
+own — matching upstream's `read_to_end`.
+
+Borrowed bytes must survive all the way into the asset or the saving is undone at the last step.
+Three additive constructors exist for that, and new asset types holding bulk bytes should follow
+the pattern:
+
+| Constructor | Borrowed path |
+| ----------- | ------------- |
+| `Shader::from_wgsl` / `from_wesl` / `from_spirv` | `Source` holds `Cow<'static, _>` directly |
+| `Image::new_cow` | stores the `Cow` as-is |
+| `Font::from_cow` | wraps static bytes in an `Arc`, no copy |
+
+Each is additive — the owned-`Vec` constructor keeps its signature. Widening the existing
+constructor to `impl Into<Cow<..>>` was tried for `Image::new` and reverted: the generic parameter
+breaks inference at call sites passing `.collect()`, which contradicts P3.
 
 ### CowArc — `bevy_utils`
 
@@ -252,6 +269,8 @@ git apply -3 --exclude=<deleted/path> fork-delta.patch
 # 4. resolve, then verify — including the targets the default build misses
 cargo check --workspace
 cargo check -p bevy_gltf --target wasm32-unknown-unknown
+cargo check -p bevy_utils --no-default-features        # no_std
+cargo check -p bevy_image --features serialize         # BRP image transfer
 cargo check -p bevy_asset --features embedded_watcher
 cargo check -p bevy_image --features exr
 cargo check -p bevy_pbr --features meshlet
@@ -305,8 +324,13 @@ The default build does not compile `exr`, `meshlet`, `embedded_watcher`, `file_w
 - Removing the unused `IoTaskPool` import stranded its `#[cfg(not(target_arch = "wasm32"))]`
   attribute onto the next import, breaking the wasm32 build while native builds stayed green.
 
-All three are fixed. The lesson is the verification list in [Merging upstream](#merging-upstream):
-the default `cargo check` is not sufficient evidence for this fork.
+A later audit found two more in the same blind spot: `bevy_image --features serialize` failed
+because `SerializedImage` still declared `Vec<u8>`, and `bevy_utils --no-default-features` failed
+because `cow_arc.rs` imported `std` in a `#![no_std]` crate.
+
+All five are fixed. The lesson is the verification list in
+[Merging upstream](#merging-upstream): the default `cargo check` is not sufficient evidence for
+this fork. Every defect found in this fork to date has been in code the default build skips.
 
 ### Dead weight removed
 
