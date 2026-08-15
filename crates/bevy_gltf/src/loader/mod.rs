@@ -38,7 +38,6 @@ use bevy_platform::collections::{HashMap, HashSet};
 use bevy_reflect::TypePath;
 use bevy_render::render_resource::Face;
 use bevy_scene::Scene;
-#[cfg(not(target_arch = "wasm32"))]
 use bevy_transform::components::Transform;
 use gltf::{
     accessor::Iter,
