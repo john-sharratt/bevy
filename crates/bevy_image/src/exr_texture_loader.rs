@@ -35,7 +35,6 @@ impl AssetLoader for ExrTextureLoader {
     async fn load(
         &self,
         reader: &mut dyn Reader,
-        bytes: Option<&[u8]>,
         settings: &Self::Settings,
         _load_context: &mut LoadContext<'_>,
     ) -> Result<Image, Self::Error> {
@@ -46,16 +45,9 @@ impl AssetLoader for ExrTextureLoader {
             "Format should have 32bit x 4 size"
         );
 
-        let mut bytes_store;
-        let bytes = match bytes {
-            Some(bytes) => bytes,
-            None => {
-                bytes_store = reader.read_to_cow().await?;
-                bytes_store.as_slice()
-            }
-        };
+        let bytes = reader.read_to_cow().await?;
         let decoder = image::codecs::openexr::OpenExrDecoder::with_alpha_preference(
-            std::io::Cursor::new(bytes),
+            std::io::Cursor::new(bytes.as_ref()),
             Some(true),
         )?;
         let (width, height) = decoder.dimensions();

@@ -84,7 +84,6 @@ impl AssetLoader for TextLoader {
     async fn load(
         &self,
         reader: &mut dyn Reader,
-        bytes: Option<&[u8]>,
         settings: &TextSettings,
         _load_context: &mut LoadContext<'_>,
     ) -> Result<Text, Self::Error> {
@@ -92,7 +91,7 @@ impl AssetLoader for TextLoader {
         let value = if let Some(ref text) = settings.text_override {
             text.clone()
         } else {
-            String::from_utf8(&bytes).unwrap()
+            String::from_utf8(bytes.into_owned()).unwrap()
         };
         Ok(Text(value))
     }
@@ -141,7 +140,6 @@ impl AssetLoader for CoolTextLoader {
     async fn load(
         &self,
         reader: &mut dyn Reader,
-        bytes: Option<&[u8]>,
         _settings: &Self::Settings,
         load_context: &mut LoadContext<'_>,
     ) -> Result<CoolText, Self::Error> {
