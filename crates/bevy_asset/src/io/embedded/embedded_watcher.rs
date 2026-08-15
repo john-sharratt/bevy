@@ -77,7 +77,10 @@ impl FilesystemEventHandler for EmbeddedEventHandler {
                     let mut reader = BufReader::new(file);
                     
                     // Read file into vector.
-                    if let Ok(buffer) = reader.read_to_cow() {
+                    let mut buffer = Vec::new();
+                    // NOTE: this is a synchronous `std::io::BufReader` over a file on disk, not an
+                    // asset `Reader`, so `read_to_cow` does not apply; a file is never 'static.
+                    if reader.read_to_end(&mut buffer).is_ok() {
                         self.dir.insert_asset(path, buffer);
                     }
                 }
