@@ -135,7 +135,13 @@ Same contract as INV-1, one layer up. `AudioLoader` maps `Cow::Borrowed → CowA
 
 Absent `RenderLayers` on either side means `RenderLayers::default()` (layer 0), so untagged volumes
 and untagged cameras still see each other — the change is backward compatible for scenes that never
-opt in.
+opt in. Both sides are compared by reference against one shared default, which keeps the
+`as_ptr()` fast path in `RenderLayers::intersects` working; do not reintroduce `.cloned()` here.
+
+Volumetric *lights* are a separate matter and are not the fork's concern: `bevy_pbr::render::light`
+extracts `RenderLayers` for every light itself, and filters directional lights against the view's
+layers before setting the VOLUMETRIC flag. Point and spot lights are not layer-filtered anywhere in
+Bevy, since clustering has no notion of layers.
 
 ### ⚠ INV-9 — glTF textures load serially
 
@@ -233,9 +239,10 @@ cursors, and two large-scene examples all touch it. Nearly every site is a mecha
 
 ### Volumetric fog render layers — `bevy_pbr`
 
-`VolumetricFog`, `FogVolume` and `VolumetricLight` now extract an optional `RenderLayers`, and
-uniform preparation skips volume/view pairs whose layers don't intersect. Without this, every fog
-volume renders into every camera. See INV-8 for the default-layer behaviour.
+`VolumetricFog` and `FogVolume` now extract an optional `RenderLayers`, and uniform preparation
+skips volume/view pairs whose layers don't intersect. Without this, every fog volume renders into
+every camera. See INV-8 for the default-layer behaviour and for how volumetric *lights* are handled
+(upstream already covers them for directional lights).
 
 ### Hash derives
 
