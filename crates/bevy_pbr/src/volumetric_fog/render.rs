@@ -241,7 +241,7 @@ pub fn extract_volumetric_fog(
     mut commands: Commands,
     view_targets: Extract<Query<(RenderEntity, &VolumetricFog, Option<&RenderLayers>)>>,
     fog_volumes: Extract<Query<(RenderEntity, &FogVolume, &GlobalTransform, Option<&RenderLayers>)>>,
-    volumetric_lights: Extract<Query<(RenderEntity, &VolumetricLight, Option<&RenderLayers>)>>,
+    volumetric_lights: Extract<Query<(RenderEntity, &VolumetricLight)>>,
 ) {
     if volumetric_lights.is_empty() {
         // TODO: needs better way to handle clean up in render world
@@ -279,14 +279,16 @@ pub fn extract_volumetric_fog(
         }
     }
 
-    for (entity, volumetric_light, maybe_layers) in volumetric_lights.iter() {
-        let mut cmds = commands
+    // NOTE: `RenderLayers` is deliberately not extracted here. `bevy_pbr::render::light`
+    // already extracts it onto the same render entity for every light kind, and filters
+    // directional lights against the view's layers before setting the VOLUMETRIC flag — so
+    // directional volumetric lights already respect render layers. Inserting it again would
+    // just duplicate that work every frame.
+    for (entity, volumetric_light) in volumetric_lights.iter() {
+        commands
             .get_entity(entity)
-            .expect("Volumetric light entity wasn't synced.");
-        cmds.insert(*volumetric_light);
-        if let Some(layers) = maybe_layers {
-            cmds.insert(layers.clone());
-        }
+            .expect("Volumetric light entity wasn't synced.")
+            .insert(*volumetric_light);
     }
 }
 
