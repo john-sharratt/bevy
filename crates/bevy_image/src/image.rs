@@ -1152,6 +1152,30 @@ impl Image {
         image
     }
 
+    /// Exactly the same as [`Image::new`], but accepts copy-on-write pixel data.
+    ///
+    /// Passing `Cow::Borrowed` static bytes — an `include_bytes!` texture, say — stores them
+    /// without copying. `Image::data` is only cloned if something later mutates it.
+    pub fn new_cow(
+        size: Extent3d,
+        dimension: TextureDimension,
+        data: impl Into<Cow<'static, [u8]>>,
+        format: TextureFormat,
+        asset_usage: RenderAssetUsages,
+    ) -> Self {
+        let data = data.into();
+        if let Ok(pixel_size) = format.pixel_size() {
+            debug_assert_eq!(
+                pixel_count(size) * pixel_size,
+                data.len(),
+                "Pixel data, size and format have to match",
+            );
+        }
+        let mut image = Image::new_uninit(size, dimension, format, asset_usage);
+        image.data = Some(data);
+        image
+    }
+
     /// Exactly the same as [`Image::new`], but doesn't initialize the image
     pub fn new_uninit(
         size: Extent3d,
