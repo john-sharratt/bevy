@@ -30,7 +30,14 @@ pub struct Gltf {
     pub named_materials: HashMap<Box<str>, Handle<GltfMaterial>>,
     /// All nodes loaded from the glTF file.
     pub nodes: Vec<Handle<GltfNode>>,
-    /// List of all the lights spawned within the scene
+    /// Spot lights spawned within the scene, keyed by the index of the glTF node
+    /// that produced them.
+    ///
+    /// Only [`Kind::Spot`] lights are recorded here. Directional and point lights are
+    /// spawned as usual but intentionally not tracked, since this map exists to let
+    /// spot lights be adjusted after load.
+    ///
+    /// [`Kind::Spot`]: gltf::khr_lights_punctual::Kind::Spot
     pub lights: HashMap<usize, Vec<Entity>>,
     /// Named nodes loaded from the glTF file.
     pub named_nodes: HashMap<Box<str>, Handle<GltfNode>>,

@@ -1824,8 +1824,8 @@ fn load_node(
                     for extension in extensions.iter_mut() {
                         extension.on_spawn_light_spot(load_context, gltf_node, &mut entity);
                     }
-                    // NOTE (fork): only spot lights are recorded in `Gltf::lights`.
-                    // Directional and point lights are deliberately not tracked here.
+                    // Only spot lights are recorded in `Gltf::lights`; see the field docs.
+                    // Directional and point lights are spawned above but not tracked.
                     lights
                         .entry(gltf_node.index())
                         .or_default()
