@@ -32,6 +32,7 @@ use core::{
     pin::Pin,
     task::{Context, Poll},
 };
+use std::borrow::Cow;
 use futures_io::{AsyncRead, AsyncSeek, AsyncWrite};
 use futures_lite::Stream;
 use std::{
@@ -137,6 +138,28 @@ pub trait Reader: AsyncRead + Unpin + Send + Sync {
     /// # };
     /// ```
     fn seekable(&mut self) -> Result<&mut dyn SeekableReader, ReaderNotSeekableError>;
+
+    /// Reads the entire contents of this reader into a copy-on-write construct that minimizes
+    /// the number of memory copy operations when the data is stored in static memory.
+    fn read_to_cow<'a>(
+        &'a mut self,
+    ) -> Pin<Box<dyn Future<Output = std::io::Result<Cow<'static, [u8]>>> + 'a + Send>> {
+        let f = async move {
+            if let Some(static_bytes) = self.as_static_bytes() {
+                return Ok(Cow::Borrowed(static_bytes));
+            }
+            let mut bytes = Box::new(Vec::new());
+            self.read_to_end(&mut bytes).await?;
+            Ok(Cow::Owned((*bytes).into()))
+        };
+        Box::pin(f)
+    }
+
+    /// Returns the bytes as a static slice if the reader is backed by a piece of
+    /// static memory, which avoids two copy operations.
+    fn as_static_bytes(&self) -> Option<&'static [u8]> {
+        None
+    }
 }
 
 /// A [`Reader`] that also has [`AsyncSeek`] functionality.

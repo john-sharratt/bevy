@@ -77,7 +77,7 @@ pub(crate) struct AssetServerStats {
 
 #[derive(Default)]
 pub(crate) struct AssetInfos {
-    path_to_index: HashMap<AssetPath<'static>, TypeIdMap<AssetIndex>>,
+    pub(crate) path_to_index: HashMap<AssetPath<'static>, TypeIdMap<AssetIndex>>,
     infos: HashMap<ErasedAssetIndex, AssetInfo>,
     /// If set to `true`, this informs [`AssetInfos`] to track data relevant to watching for changes (such as `load_dependents`)
     /// This should only be set at startup.
@@ -410,15 +410,17 @@ impl AssetInfos {
             let UntypedHandle::Strong(handle) = &asset.handle else {
                 unreachable!("Labeled assets are always strong handles");
             };
-            self.process_asset_load(
-                ErasedAssetIndex {
-                    index: handle.index,
-                    type_id: handle.type_id,
-                },
-                asset.asset,
-                world,
-                sender,
-            );
+            let labeled_index = ErasedAssetIndex {
+                index: handle.index,
+                type_id: handle.type_id,
+            };
+            // NOTE (fork): a labeled asset registered via
+            // `LoadContext::add_labeled_asset_handle` carries only a handle — the asset
+            // itself is owned by another load context, so there is nothing to process here.
+            let Some(labeled_asset) = asset.asset else {
+                continue;
+            };
+            self.process_asset_load(labeled_index, labeled_asset, world, sender);
         }
 
         // Check whether the handle has been dropped since the asset was loaded.

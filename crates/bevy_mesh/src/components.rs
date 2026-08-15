@@ -92,7 +92,7 @@ impl AsAssetId for Mesh2d {
 ///     ));
 /// }
 /// ```
-#[derive(Component, Clone, Debug, Default, Deref, DerefMut, Reflect, PartialEq, Eq, From)]
+#[derive(Component, Clone, Debug, Default, Deref, DerefMut, Reflect, PartialEq, Eq, Hash, From)]
 #[reflect(Component, Default, Clone, PartialEq)]
 #[require(Transform)]
 pub struct Mesh3d(pub Handle<Mesh>);

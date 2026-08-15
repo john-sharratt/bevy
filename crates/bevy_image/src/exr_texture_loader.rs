@@ -48,10 +48,9 @@ impl AssetLoader for ExrTextureLoader {
             "Format should have 32bit x 4 size"
         );
 
-        let mut bytes = Vec::new();
-        reader.read_to_end(&mut bytes).await?;
+        let bytes = reader.read_to_cow().await?;
         let decoder = image::codecs::openexr::OpenExrDecoder::with_alpha_preference(
-            std::io::Cursor::new(bytes),
+            std::io::Cursor::new(bytes.as_ref()),
             Some(true),
         )?;
         let (width, height) = decoder.dimensions();

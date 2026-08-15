@@ -9,7 +9,6 @@ use crate::{
 use alloc::{
     boxed::Box,
     string::{String, ToString},
-    vec::Vec,
 };
 use atomicow::CowArc;
 use bevy_ecs::{error::BevyError, world::World};
@@ -20,7 +19,7 @@ use core::any::{Any, TypeId};
 use downcast_rs::{impl_downcast, Downcast};
 use ron::error::SpannedError;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::{borrow::Cow, path::PathBuf};
 use thiserror::Error;
 
 /// Loads an [`Asset`] from a given byte [`Reader`]. This can accept [`AssetLoader::Settings`], which configure how the [`Asset`]
@@ -133,7 +132,7 @@ where
 }
 
 pub(crate) struct LabeledAsset {
-    pub(crate) asset: ErasedLoadedAsset,
+    pub(crate) asset: Option<ErasedLoadedAsset>,
     pub(crate) handle: UntypedHandle,
 }
 
@@ -181,7 +180,9 @@ impl<A: Asset> LoadedAsset<A> {
         &self,
         label: impl Into<CowArc<'static, str>>,
     ) -> Option<&ErasedLoadedAsset> {
-        self.labeled_assets.get(&label.into()).map(|a| &a.asset)
+        self.labeled_assets
+            .get(&label.into())
+            .and_then(|a| a.asset.as_ref())
     }
 
     /// Iterate over all labels for "labeled assets" in the loaded asset
@@ -242,7 +243,9 @@ impl ErasedLoadedAsset {
         &self,
         label: impl Into<CowArc<'static, str>>,
     ) -> Option<&ErasedLoadedAsset> {
-        self.labeled_assets.get(&label.into()).map(|a| &a.asset)
+        self.labeled_assets
+            .get(&label.into())
+            .and_then(|a| a.asset.as_ref())
     }
 
     /// Iterate over all labels for "labeled assets" in the loaded asset
@@ -424,6 +427,21 @@ impl<'a> LoadContext<'a> {
             .expect("the closure returns Ok")
     }
 
+    /// This will add the given `asset` as a "labeled [`Asset`]" with the `label` label
+    /// that is not owned by this particular container but another
+    ///
+    /// See [`AssetPath`] for more on labeled assets.
+    pub fn add_labeled_asset_handle<A: Asset>(&mut self, label: String, handle: Handle<A>) {
+        let untyped = handle.clone().untyped();
+        self.labeled_assets
+            .entry(label.into())
+            .or_insert_with(|| LabeledAsset {
+                asset: None,
+                handle: untyped,
+            })
+            .handle = handle.untyped();
+    }
+
     /// Add a [`LoadedAsset`] that is a "labeled sub asset" of the root path of this load context.
     /// This can be used in combination with [`LoadContext::begin_labeled_asset`] to parallelize
     /// sub asset loading.
@@ -443,7 +461,7 @@ impl<'a> LoadContext<'a> {
         self.labeled_assets.insert(
             label,
             LabeledAsset {
-                asset: loaded_asset,
+                asset: Some(loaded_asset),
                 handle: handle.clone().untyped(),
             },
         );
@@ -492,7 +510,7 @@ impl<'a> LoadContext<'a> {
     pub async fn read_asset_bytes<'b, 'c>(
         &'b mut self,
         path: impl Into<AssetPath<'c>>,
-    ) -> Result<Vec<u8>, ReadAssetBytesError> {
+    ) -> Result<Cow<'static, [u8]>, ReadAssetBytesError> {
         let path = path.into();
         let source = self.asset_server.get_source(path.source())?;
         let asset_reader = match self.asset_server.mode() {
@@ -513,9 +531,8 @@ impl<'a> LoadContext<'a> {
         } else {
             Default::default()
         };
-        let mut bytes = Vec::new();
-        reader
-            .read_to_end(&mut bytes)
+        let bytes = reader
+            .read_to_cow()
             .await
             .map_err(|source| ReadAssetBytesError::Io {
                 path: path.path().to_path_buf(),
