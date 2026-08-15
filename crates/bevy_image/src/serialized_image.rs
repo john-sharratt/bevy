@@ -1,6 +1,7 @@
 use crate::{Image, ImageSampler};
 use bevy_asset::RenderAssetUsages;
 use core::fmt::Debug;
+use std::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use wgpu_types::{
     TextureAspect, TextureDataOrder, TextureDescriptor, TextureFormat, TextureUsages,
@@ -102,7 +103,8 @@ impl SerializedImage {
     /// Creates a new [`SerializedImage`] from an [`Image`].
     pub fn from_image(image: Image) -> Self {
         Self {
-            data: image.data,
+            // `Image::data` is copy-on-write; the wire format owns its bytes.
+            data: image.data.map(Cow::into_owned),
             data_order: SerializedTextureDataOrder::from_texture_data_order(image.data_order),
             texture_descriptor: TextureDescriptor {
                 label: (),
@@ -124,7 +126,7 @@ impl SerializedImage {
     /// Create an [`Image`] from a [`SerializedImage`].
     pub fn into_image(self) -> Image {
         Image {
-            data: self.data,
+            data: self.data.map(Cow::Owned),
             data_order: self.data_order.into_texture_data_order(),
             texture_descriptor: TextureDescriptor {
                 // Not used for asset-based images other than debugging
