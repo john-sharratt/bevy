@@ -137,7 +137,7 @@ impl<'a> TextureAtlasBuilder<'a> {
             let end = begin + rect_width * format_size;
             let texture_begin = texture_y * rect_width * format_size;
             let texture_end = texture_begin + rect_width * format_size;
-            atlas_data[begin..end].copy_from_slice(&data[texture_begin..texture_end]);
+            atlas_data.to_mut()[begin..end].copy_from_slice(&data[texture_begin..texture_end]);
         }
         Ok(())
     }

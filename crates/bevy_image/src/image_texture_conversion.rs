@@ -183,6 +183,8 @@ impl Image {
         let Some(data) = self.data else {
             return Err(IntoDynamicImageError::UninitializedImage);
         };
+        // The image crate's buffers own their pixels
+        let data = data.into_owned();
         match self.texture_descriptor.format {
             TextureFormat::R8Unorm => {
                 ImageBuffer::from_raw(width, height, data).map(DynamicImage::ImageLuma8)
@@ -362,7 +364,7 @@ mod test {
         for (dyn_img, format, data) in cases {
             let image = Image::from_dynamic_inner(dyn_img, true, false, usage);
             assert_eq!(image.texture_descriptor.format, format);
-            assert_eq!(image.data, Some(data));
+            assert_eq!(image.data.as_deref(), Some(data.as_slice()));
         }
     }
 

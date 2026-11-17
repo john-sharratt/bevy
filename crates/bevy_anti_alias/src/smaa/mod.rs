@@ -330,7 +330,7 @@ impl Plugin for SmaaPlugin {
             let format = TextureFormat::Rgba8Unorm;
             let data = vec![255, 0, 255, 255];
             let handle = images.add(Image {
-                data: Some(data),
+                data: Some(data.into()),
                 data_order: TextureDataOrder::default(),
                 texture_descriptor: TextureDescriptor {
                     size: Extent3d::default(),

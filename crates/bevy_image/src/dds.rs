@@ -106,11 +106,11 @@ pub fn dds_buffer_to_image(
         match transcode_format {
             TranscodeFormat::Rgb8 => {
                 let (chunks, _) = dds.data.as_chunks();
-                let data = chunks
+                let data: Vec<u8> = chunks
                     .iter()
                     .flat_map(|&[r, g, b]| [r, g, b, u8::MAX])
                     .collect();
-                Some(data)
+                Some(data.into())
             }
             _ => {
                 return Err(TextureError::TranscodeError(format!(
@@ -119,7 +119,7 @@ pub fn dds_buffer_to_image(
             }
         }
     } else {
-        Some(dds.data)
+        Some(dds.data.into())
     };
 
     Ok(image)

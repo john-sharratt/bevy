@@ -94,7 +94,7 @@ pub(crate) fn extract_rgba_pixels(image: &Image) -> Option<Vec<u8>> {
         | TextureFormat::Rgba8UnormSrgb
         | TextureFormat::Rgba8Snorm
         | TextureFormat::Rgba8Uint
-        | TextureFormat::Rgba8Sint => Some(image.data.clone()?),
+        | TextureFormat::Rgba8Sint => Some(image.data.as_deref()?.to_vec()),
         TextureFormat::Rgba32Float => image.data.as_ref().map(|data| {
             data.as_chunks()
                 .0

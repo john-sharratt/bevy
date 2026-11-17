@@ -115,7 +115,7 @@ pub fn basis_buffer_to_image(
             )))
         }
     };
-    image.data = Some(transcoded);
+    image.data = Some(transcoded.into());
     Ok(image)
 }
 

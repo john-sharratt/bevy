@@ -6,6 +6,7 @@ use super::basis::*;
 use super::dds::*;
 #[cfg(feature = "ktx2")]
 use super::ktx2::*;
+use alloc::borrow::Cow;
 use bevy_app::{App, Plugin};
 #[cfg(not(feature = "bevy_reflect"))]
 use bevy_reflect::TypePath;
@@ -636,7 +637,11 @@ pub struct Image {
     /// If the image is being used as a storage texture which doesn't need to be initialized by the
     /// CPU, then this should be `None`.
     /// Otherwise, it should always be `Some`.
-    pub data: Option<Vec<u8>>,
+    ///
+    /// The bytes are either owned or borrowed for `'static`, such as from a memory-mapped file
+    /// or data embedded in the binary. Borrowed bytes are never copied to load, clone or upload
+    /// the image; the first write to them (`Cow::to_mut`) makes an owned copy.
+    pub data: Option<Cow<'static, [u8]>>,
     /// For texture data with layers and mips, this field controls how wgpu interprets the buffer layout.
     ///
     /// Use [`TextureDataOrder::default()`] for all other cases.
@@ -1102,14 +1107,14 @@ impl Default for Image {
     /// default is a 1x1x1 all '1.0' texture
     fn default() -> Self {
         let mut image = Image::default_uninit();
-        image.data = Some(vec![
+        image.data = Some(Cow::Owned(vec![
             255;
             image
                 .texture_descriptor
                 .format
                 .pixel_size()
                 .unwrap_or(0)
-        ]);
+        ]));
         image
     }
 }
@@ -1127,6 +1132,24 @@ impl Image {
         format: TextureFormat,
         asset_usage: RenderAssetUsages,
     ) -> Self {
+        Image::new_static(size, dimension, data, format, asset_usage)
+    }
+
+    /// Creates a new image from raw binary data and the corresponding metadata, where the data
+    /// may be borrowed for `'static` instead of owned. A borrowed slice, such as one from a
+    /// memory-mapped file or one embedded in the binary, is used in place and never copied.
+    ///
+    /// # Panics
+    /// Panics if the length of the `data`, volume of the `size` and the size of the `format`
+    /// do not match.
+    pub fn new_static(
+        size: Extent3d,
+        dimension: TextureDimension,
+        data: impl Into<Cow<'static, [u8]>>,
+        format: TextureFormat,
+        asset_usage: RenderAssetUsages,
+    ) -> Self {
+        let data = data.into();
         if let Ok(pixel_size) = format.pixel_size() {
             debug_assert_eq!(
                 pixel_count(size) * pixel_size,
@@ -1225,8 +1248,8 @@ impl Image {
                 pixel.len() <= byte_len,
                 "Fill data must fit within pixel buffer (expected {byte_len}B).",
             );
-            let data = pixel.iter().copied().cycle().take(byte_len).collect();
-            image.data = Some(data);
+            let data: Vec<u8> = pixel.iter().copied().cycle().take(byte_len).collect();
+            image.data = Some(Cow::Owned(data));
         }
         image
     }
@@ -1274,7 +1297,7 @@ impl Image {
         ];
 
         Image {
-            data: Some(data),
+            data: Some(Cow::Owned(data)),
             data_order: TextureDataOrder::default(),
             texture_descriptor: TextureDescriptor {
                 size,
@@ -1340,7 +1363,7 @@ impl Image {
         if let Some(ref mut data) = self.data
             && let Ok(pixel_size) = self.texture_descriptor.format.pixel_size()
         {
-            data.resize(pixel_count(size) * pixel_size, 0);
+            data.to_mut().resize(pixel_count(size) * pixel_size, 0);
         }
     }
 
@@ -1371,7 +1394,7 @@ impl Image {
             let byte_len = pixel_size * pixel_count(new_size);
             self.texture_descriptor.size = new_size;
 
-            let Some(ref mut data) = self.data else {
+            let Some(ref data) = self.data else {
                 self.copy_on_resize = true;
                 return;
             };
@@ -1402,7 +1425,7 @@ impl Image {
                 }
             }
 
-            self.data = Some(new);
+            self.data = Some(Cow::Owned(new));
         }
     }
 
@@ -1518,7 +1541,7 @@ impl Image {
                     }
                 }
 
-                Some(new_data)
+                Some(Cow::Owned(new_data))
             }
             None => None,
         };
@@ -1736,7 +1759,7 @@ impl Image {
             return Err(TextureAccessError::Uninitialized);
         };
 
-        Ok(&mut data[offset..(offset + len)])
+        Ok(&mut data.to_mut()[offset..(offset + len)])
     }
 
     /// Clears the content of the image with the given pixel. The image needs to be initialized on
@@ -1759,7 +1782,7 @@ impl Image {
                 "Clear data must fit within pixel buffer (expected {byte_len}B).",
             );
             if let Some(data) = self.data.as_mut() {
-                for pixel_data in data.chunks_mut(pixel_size) {
+                for pixel_data in data.to_mut().chunks_mut(pixel_size) {
                     pixel_data.copy_from_slice(pixel);
                 }
             }
@@ -2931,5 +2954,49 @@ mod test {
 
         assert_eq!(my_sampler_in_a_loader.min_filter, ImageFilterMode::Linear);
         assert_eq!(my_sampler_in_a_loader.anisotropy_clamp, 8);
+    }
+
+    static BORROWED_PIXELS: [u8; 8] = [1, 2, 3, 4, 5, 6, 7, 8];
+
+    fn borrowed_image() -> Image {
+        Image::new_static(
+            Extent3d {
+                width: 2,
+                height: 1,
+                depth_or_array_layers: 1,
+            },
+            TextureDimension::D2,
+            &BORROWED_PIXELS[..],
+            TextureFormat::Rgba8Unorm,
+            RenderAssetUsages::all(),
+        )
+    }
+
+    fn pixels_ptr(image: &Image) -> *const u8 {
+        image.data.as_ref().unwrap().as_ptr()
+    }
+
+    #[test]
+    fn static_data_is_borrowed_and_stays_borrowed_through_a_clone() {
+        let image = borrowed_image();
+        assert!(matches!(image.data, Some(Cow::Borrowed(_))));
+        assert_eq!(pixels_ptr(&image), BORROWED_PIXELS.as_ptr());
+
+        let clone = image.clone();
+        assert!(matches!(clone.data, Some(Cow::Borrowed(_))));
+        assert_eq!(pixels_ptr(&clone), BORROWED_PIXELS.as_ptr());
+    }
+
+    #[test]
+    fn a_write_to_borrowed_data_copies_it_and_leaves_the_source_alone() {
+        let mut image = borrowed_image();
+        image
+            .pixel_bytes_mut(UVec3::new(1, 0, 0))
+            .unwrap()
+            .copy_from_slice(&[9, 9, 9, 9]);
+
+        assert!(matches!(image.data, Some(Cow::Owned(_))));
+        assert_eq!(image.data.as_deref(), Some(&[1, 2, 3, 4, 9, 9, 9, 9][..]));
+        assert_eq!(BORROWED_PIXELS, [1, 2, 3, 4, 5, 6, 7, 8]);
     }
 }
